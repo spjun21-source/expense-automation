@@ -27,27 +27,53 @@ class TutorialEngine {
   renderWorkflow(container) {
     if (!container) return;
     container.innerHTML = '';
+    let currentGroup = '';
 
     WORKFLOW_STEPS.forEach((step, idx) => {
+      // Group header
+      if (step.groupTitle && step.group !== currentGroup) {
+        currentGroup = step.group;
+        const groupHeader = document.createElement('div');
+        groupHeader.className = `workflow-group-header ${step.group}`;
+        groupHeader.innerHTML = `<h3>${step.groupTitle}</h3>`;
+        container.appendChild(groupHeader);
+      }
+
       const isCompleted = this.progress.completedSteps.includes(step.id);
       const card = document.createElement('div');
-      card.className = `workflow-step ${isCompleted ? 'completed' : ''}`;
+      card.className = `workflow-step ${isCompleted ? 'completed' : ''} group-${step.group || 'default'}`;
       card.dataset.stepIdx = idx;
+
+      // Step number display
+      const stepNum = step.order < 1 ? `A${Math.round(step.order * 10) + 1}` : step.order;
 
       card.innerHTML = `
         <div class="step-header" data-idx="${idx}">
-          <div class="step-number">${step.order}</div>
+          <div class="step-number">${stepNum}</div>
           <div class="step-info">
             <div class="step-title">${step.icon} ${step.title}</div>
             <div class="step-desc">${step.description}</div>
+            ${step.system ? `<div class="step-system-badge">🖥️ ${step.system}</div>` : ''}
+            ${step.refPage ? `<span class="step-ref-badge">📖 ${step.refPage}</span>` : ''}
           </div>
           <div class="step-toggle">▼</div>
         </div>
         <div class="step-body" id="stepBody_${idx}" style="display:none;">
+          ${step.system ? `
+          <div class="step-system-info">
+            <div class="system-label">🖥️ 접속 시스템</div>
+            <div class="system-name">${step.system}</div>
+            ${step.systemUrl ? `<a href="${step.systemUrl}" target="_blank" class="system-link">${step.systemUrl} ↗</a>` : ''}
+          </div>` : ''}
           <div class="step-details">
             <h4>상세 절차</h4>
             <ul>${step.details.map(d => `<li>${d}</li>`).join('')}</ul>
           </div>
+          ${step.approvalLine ? `
+          <div class="step-approval">
+            <h4>📋 결재 라인</h4>
+            <div class="approval-line-visual">${step.approvalLine.split(' → ').map(p => `<span class="approval-person">${p}</span>`).join('<span class="approval-arrow">→</span>')}</div>
+          </div>` : ''}
           ${step.requiredDocs.length > 0 ? `
           <div class="step-docs">
             <h4>📎 필요 서류</h4>

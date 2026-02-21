@@ -328,6 +328,160 @@ body {
   font-size: 0.78rem;
 }
 
+/* --- Workflow Group Headers --- */
+.workflow-group-header {
+  margin-top: 24px;
+  margin-bottom: 8px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  border-left: 4px solid;
+}
+
+.workflow-group-header:first-child {
+  margin-top: 0;
+}
+
+.workflow-group-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.workflow-group-header.revenue {
+  background: rgba(16, 185, 129, 0.08);
+  border-left-color: var(--success);
+}
+
+.workflow-group-header.revenue h3 {
+  color: var(--success);
+}
+
+.workflow-group-header.expense {
+  background: rgba(99, 102, 241, 0.08);
+  border-left-color: var(--primary);
+}
+
+.workflow-group-header.expense h3 {
+  color: var(--primary);
+}
+
+/* Group color accents */
+.workflow-step.group-revenue {
+  border-left: 3px solid rgba(16, 185, 129, 0.3);
+}
+
+.workflow-step.group-revenue.completed {
+  border-left: 3px solid var(--success);
+}
+
+.workflow-step.group-revenue .step-number {
+  background: linear-gradient(135deg, var(--success), #059669);
+  font-size: 0.75rem;
+}
+
+.workflow-step.group-expense .step-number {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+
+/* --- System Badge (inline on step header) --- */
+.step-system-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--warning);
+  letter-spacing: 0.3px;
+}
+
+/* --- Reference Page Badge --- */
+.step-ref-badge {
+  display: inline-block;
+  margin-top: 6px;
+  margin-left: 8px;
+  padding: 3px 10px;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+/* --- System Info Block (expanded body) --- */
+.step-system-info {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.system-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.system-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.system-link {
+  font-size: 0.78rem;
+  color: var(--primary);
+  text-decoration: none;
+  margin-left: auto;
+}
+
+.system-link:hover {
+  text-decoration: underline;
+}
+
+/* --- Approval Line --- */
+.step-approval {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.step-approval h4 {
+  font-size: 0.88rem;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.approval-line-visual {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+}
+
+.approval-person {
+  padding: 6px 14px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.approval-arrow {
+  color: var(--text-dim);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 /* --- Quiz --- */
 .step-quiz {
   margin-top: 16px;
