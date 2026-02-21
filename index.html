@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>사업단 경비 처리 자동화 시스템</title>
+  <meta name="description" content="ER 바이오코어 사업단 경비 처리 업무 튜토리얼, 시뮬레이션, 결의서 작성 및 엑셀 내보내기 시스템">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1 class="app-title">🏥 사업단 경비 처리 자동화</h1>
+        <p class="app-subtitle">ER 바이오코어 사업단 업무 튜토리얼 & 증빙 관리</p>
+      </div>
+      <div class="header-right">
+        <span class="header-date" id="currentDate"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard Stats -->
+  <div class="dashboard">
+    <div class="stat-card">
+      <div class="stat-icon">📖</div>
+      <div class="stat-value" id="statSteps">0/7</div>
+      <div class="stat-label">학습 완료</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📝</div>
+      <div class="stat-value" id="statQuiz">0%</div>
+      <div class="stat-label">퀴즈 정답률</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🎯</div>
+      <div class="stat-value" id="statScenarios">0/4</div>
+      <div class="stat-label">시나리오 완료</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📄</div>
+      <div class="stat-value" id="statDocs">0</div>
+      <div class="stat-label">생성 문서</div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="tutorial">📖 학습 모드</button>
+    <button class="tab-btn" data-tab="practice">🎯 연습 모드</button>
+    <button class="tab-btn" data-tab="production">⚡ 실전 모드</button>
+    <button class="tab-btn" data-tab="reference">📚 증빙 가이드</button>
+  </nav>
+
+  <!-- Tab Panels -->
+  <main class="tab-panels">
+
+    <!-- 학습 모드 -->
+    <section class="tab-panel active" id="panelTutorial">
+      <div class="section-header">
+        <h2 class="section-title">📖 경비 처리 업무 절차 (인수인계서 기준)</h2>
+        <p class="section-subtitle">각 단계를 클릭하여 상세 내용과 퀴즈를 확인하세요. 인수인계서 양식과 1:1 매칭되었습니다.</p>
+      </div>
+      <div id="workflowContainer" class="workflow-container"></div>
+    </section>
+
+    <!-- 연습 모드 -->
+    <section class="tab-panel" id="panelPractice">
+      <div class="section-header">
+        <h2 class="section-title">🎯 시나리오 기반 시뮬레이션</h2>
+        <p class="section-subtitle">실제와 유사한 상황에서 경비 처리 업무를 연습하세요. 엑셀 기록 예시도 확인할 수 있습니다.</p>
+      </div>
+      <div class="scenario-grid" id="scenarioGrid"></div>
+
+      <!-- 2025 Expense Reference -->
+      <div class="section-header" style="margin-top:40px;">
+        <h2 class="section-title">📊 2025년 지출내역 참조</h2>
+        <p class="section-subtitle">2025년 ER바이오코어사업단 지출내역 데이터입니다. 2026년 예산 관리에 참고하세요.</p>
+      </div>
+      <div id="expenseRefContainer"></div>
+    </section>
+
+    <!-- 실전 모드 -->
+    <section class="tab-panel" id="panelProduction">
+      <div class="section-header">
+        <h2 class="section-title">⚡ 결의서 작성 & 엑셀 내보내기</h2>
+        <p class="section-subtitle">결의서를 작성하고 PDF 인쇄 또는 지출내역 엑셀 형식으로 내보내기 하세요</p>
+      </div>
+
+      <!-- Resolution Type Selector -->
+      <div class="resolution-types">
+        <button class="resolution-type-btn active" data-type="expense_resolution">
+          <span class="res-icon">💸</span>
+          <span class="res-name">지출결의서</span>
+        </button>
+        <button class="resolution-type-btn" data-type="income_resolution">
+          <span class="res-icon">💰</span>
+          <span class="res-name">수입결의서</span>
+        </button>
+        <button class="resolution-type-btn" data-type="substitute_resolution">
+          <span class="res-icon">🔄</span>
+          <span class="res-name">대체결의서</span>
+        </button>
+      </div>
+
+      <!-- Form Editor -->
+      <div class="form-editor">
+        <div class="form-editor-header">
+          <h3 id="formEditorTitle">지출결의서</h3>
+          <div class="form-actions">
+            <button class="btn btn-outline" id="btnPreview">👁️ 미리보기</button>
+            <button class="btn btn-primary" id="btnPDF">📄 PDF 인쇄</button>
+            <button class="btn btn-success" id="btnExcel">📊 엑셀 내보내기</button>
+          </div>
+        </div>
+        <div id="formEditorBody" class="form-editor-body"></div>
+      </div>
+
+      <!-- Preview Modal -->
+      <div class="preview-modal" id="previewModal" style="display:none;">
+        <div class="preview-header">
+          <h3>📄 미리보기</h3>
+        </div>
+        <div id="previewContent" class="preview-content"></div>
+      </div>
+    </section>
+
+    <!-- 증빙 가이드 -->
+    <section class="tab-panel" id="panelReference">
+      <div class="section-header">
+        <h2 class="section-title">📚 증빙서류 가이드</h2>
+        <p class="section-subtitle">경비 처리에 필요한 증빙서류 유형과 용도를 안내합니다. 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
+      </div>
+      <div class="doc-grid" id="docGrid"></div>
+    </section>
+  </main>
+
+  <!-- Document Detail Modal -->
+  <div class="doc-detail-overlay" id="docDetailModal" style="display:none;">
+    <div class="doc-detail-modal">
+      <button class="doc-detail-close" onclick="window.app.closeDocDetail()">✕</button>
+      <div id="docDetailContent"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
