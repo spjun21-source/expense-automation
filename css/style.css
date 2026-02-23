@@ -2549,3 +2549,184 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ============================================================
+   v5.2 - Enhanced Summary & Daily Comment
+   ============================================================ */
+
+/* --- Save Flash Indicator --- */
+.tasks-save-flash {
+  font-size: 0.75rem;
+  color: var(--success);
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.tasks-save-flash.visible {
+  opacity: 1;
+}
+
+/* --- Footer Summary Table --- */
+.tasks-footer-summary {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--border);
+}
+
+.footer-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+}
+
+.task-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.task-summary-table th,
+.task-summary-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.task-summary-table th {
+  color: var(--text-dim);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.task-summary-table td:nth-child(2) {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.task-summary-table tfoot th {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+/* Progress bar inside table */
+.progress-bar {
+  display: inline-block;
+  vertical-align: middle;
+  width: 60px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  margin-right: 8px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: #94a3b8;
+  border-radius: 3px;
+}
+
+.bar-fill.blue {
+  background: #3b82f6;
+}
+
+.bar-fill.green {
+  background: var(--success);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.dot.waiting {
+  background: #94a3b8;
+}
+
+.dot.progress {
+  background: #3b82f6;
+}
+
+.dot.done {
+  background: var(--success);
+}
+
+/* --- Daily Comment Area --- */
+.tasks-comment-area {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(99, 102, 241, 0.03);
+  border-top: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.comment-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary-light);
+}
+
+.btn-text-only {
+  background: none;
+  border: none;
+  color: var(--primary-light);
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.7;
+}
+
+.btn-text-only:hover {
+  opacity: 1;
+}
+
+.daily-comment-input {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.daily-comment-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.comment-footer {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: right;
+  font-style: italic;
+}
+
+.btn-xs {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 4px;
+}
