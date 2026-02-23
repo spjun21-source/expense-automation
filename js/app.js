@@ -1,21 +1,89 @@
 // ============================================================
-// 사업단 경비 처리 자동화 - Main Application (v2)
+// 사업단 경비 처리 자동화 - Main Application (v5)
 // ============================================================
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
 import { FormManager } from './forms.js';
+import { AuthManager } from './auth.js';
+import { DocumentStore } from './store.js';
+import { TaskManager } from './tasks.js';
+import { ApprovalManager } from './approval.js';
 
 class App {
     constructor() {
+        this.auth = new AuthManager();
+        this.store = new DocumentStore();
         this.tutorial = new TutorialEngine();
         this.formManager = new FormManager();
+        this.approvalMgr = new ApprovalManager(this.store);
+        this.taskMgr = null; // initialized after login
         this.currentTab = 'tutorial';
         this.expenseData = [];
+        this.editingDocId = null; // for edit mode
         this.init();
     }
 
     async init() {
+        // Check existing session
+        if (this.auth.isLoggedIn()) {
+            this._showApp();
+        } else {
+            this._showLogin();
+        }
+        this._bindLoginEvents();
+    }
+
+    // ============================================
+    // Login / Logout
+    // ============================================
+    _showLogin() {
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+    }
+
+    _showApp() {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        this._initApp();
+    }
+
+    _bindLoginEvents() {
+        const loginBtn = document.getElementById('loginBtn');
+        const loginId = document.getElementById('loginId');
+        const loginPw = document.getElementById('loginPw');
+        const loginError = document.getElementById('loginError');
+
+        const doLogin = () => {
+            const result = this.auth.login(loginId.value, loginPw.value);
+            if (result.success) {
+                loginError.textContent = '';
+                loginId.value = '';
+                loginPw.value = '';
+                this._showApp();
+            } else {
+                loginError.textContent = result.error;
+            }
+        };
+
+        loginBtn?.addEventListener('click', doLogin);
+        loginPw?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+        loginId?.addEventListener('keydown', e => { if (e.key === 'Enter') loginPw?.focus(); });
+    }
+
+    async _initApp() {
+        const user = this.auth.getCurrentUser();
+        if (!user) return;
+
+        // Header user info
+        const headerUser = document.getElementById('headerUser');
+        const headerRole = document.getElementById('headerRole');
+        if (headerUser) headerUser.textContent = `👤 ${user.name}`;
+        if (headerRole) {
+            headerRole.textContent = user.role === 'admin' ? '관리자' : '사용자';
+            headerRole.className = `header-role ${user.role}`;
+        }
+
         // Date
         const dateEl = document.getElementById('currentDate');
         if (dateEl) {
@@ -23,6 +91,28 @@ class App {
                 year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
             });
         }
+
+        // Init task manager
+        this.taskMgr = new TaskManager(user.id, {
+            isAdmin: this.auth.isAdmin(),
+            allUserIds: this.auth.getUsers().map(u => u.id)
+        });
+        this.taskMgr.render(document.getElementById('tasksContainer'));
+
+        // Admin UI visibility
+        if (this.auth.isAdmin()) {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+            this.updatePendingBadge();
+        } else {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        }
+
+        // Logout
+        document.getElementById('logoutBtn')?.addEventListener('click', () => {
+            this.auth.logout();
+            this.editingDocId = null;
+            this._showLogin();
+        });
 
         // Load 2025 expense data
         await this.loadExpenseData();
@@ -39,6 +129,7 @@ class App {
                 btn.classList.add('active');
                 const type = btn.dataset.type;
                 this.formManager.setFormType(type);
+                this.editingDocId = null;
                 const titleEl = document.getElementById('formEditorTitle');
                 if (titleEl) titleEl.textContent = FORM_FIELDS[type].title;
                 this.formManager.renderForm(document.getElementById('formEditorBody'));
@@ -50,6 +141,19 @@ class App {
         document.getElementById('btnPreview')?.addEventListener('click', () => this.previewForm());
         document.getElementById('btnPDF')?.addEventListener('click', () => this.exportForm());
         document.getElementById('btnExcel')?.addEventListener('click', () => this.exportExcel());
+        document.getElementById('btnSaveDoc')?.addEventListener('click', () => this.saveDocument());
+        document.getElementById('btnSubmitDoc')?.addEventListener('click', () => this.submitDocument());
+
+        // Export filtered
+        document.getElementById('btnExportFiltered')?.addEventListener('click', () => this.exportFiltered());
+
+        // Set default export dates
+        const today = new Date().toISOString().split('T')[0];
+        const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+        const startInput = document.getElementById('exportStart');
+        const endInput = document.getElementById('exportEnd');
+        if (startInput) startInput.value = monthAgo;
+        if (endInput) endInput.value = today;
 
         // Initial renders
         this.tutorial.renderWorkflow(document.getElementById('workflowContainer'));
@@ -58,6 +162,12 @@ class App {
         this.formManager.renderForm(document.getElementById('formEditorBody'));
         this.renderDocGuide();
         this.renderExpenseReference();
+        this.renderMyDocs();
+        if (this.auth.isAdmin()) {
+            this.approvalMgr.renderPendingList(document.getElementById('approvalContainer'));
+            this.approvalMgr.renderHistory(document.getElementById('approvalHistoryContainer'));
+            this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
+        }
         this.updateStats();
     }
 
@@ -67,7 +177,6 @@ class App {
             const json = await resp.json();
             const sheet = json.sheet1 || [];
             if (sheet.length > 1) {
-                // First row is headers, rest are data
                 const headers = sheet[0];
                 for (let i = 1; i < sheet.length; i++) {
                     const row = {};
@@ -85,19 +194,36 @@ class App {
     switchTab(tabId) {
         this.currentTab = tabId;
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
-        const panelMap = { tutorial: 'panelTutorial', practice: 'panelPractice', production: 'panelProduction', reference: 'panelReference' };
+        const panelMap = {
+            tutorial: 'panelTutorial',
+            practice: 'panelPractice',
+            production: 'panelProduction',
+            mydocs: 'panelMyDocs',
+            admin: 'panelAdmin',
+            reference: 'panelReference'
+        };
         document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
         const activePanel = document.getElementById(panelMap[tabId]);
         if (activePanel) activePanel.classList.add('active');
+
+        // Refresh lists on tab switch
+        if (tabId === 'mydocs') this.renderMyDocs();
+        else if (tabId === 'admin' && this.auth.isAdmin()) {
+            this.approvalMgr.renderPendingList(document.getElementById('approvalContainer'));
+            this.approvalMgr.renderHistory(document.getElementById('approvalHistoryContainer'));
+            this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
+        }
     }
 
     updateStats() {
         const stats = this.tutorial.getStats();
+        const user = this.auth.getCurrentUser();
+        const myDocs = user ? this.store.getByUser(user.id) : [];
         const els = {
             statSteps: `${stats.completedSteps}/${stats.totalSteps}`,
             statQuiz: `${stats.quizRate}%`,
             statScenarios: `${stats.completedScenarios}/${stats.totalScenarios}`,
-            statDocs: this.formManager.generatedDocs
+            statDocs: myDocs.length
         };
         Object.entries(els).forEach(([id, val]) => {
             const el = document.getElementById(id);
@@ -105,7 +231,197 @@ class App {
         });
     }
 
-    // ======== 증빙 가이드: 클릭 상세 조회 ========
+    updatePendingBadge() {
+        const badge = document.getElementById('pendingBadge');
+        if (!badge) return;
+        const count = this.store.getPendingCount();
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // 문서 저장 / 제출
+    // ============================================
+    saveDocument() {
+        const { isValid, errors, data } = this.formManager.validateForm();
+        if (!isValid) { this.showToast(`필수 항목을 입력해주세요: ${errors.join(', ')}`, 'error'); return; }
+        const user = this.auth.getCurrentUser();
+        if (!user) return;
+
+        if (this.editingDocId) {
+            const result = this.store.update(this.editingDocId, data);
+            if (result.success) {
+                this.showToast('💾 문서가 수정·저장되었습니다.', 'success');
+            } else {
+                this.showToast(result.error, 'error');
+            }
+        } else {
+            const doc = this.store.save(this.formManager.currentFormType, data, user);
+            this.editingDocId = doc.id;
+            this.showToast('💾 문서가 저장되었습니다. (상태: 작성중)', 'success');
+        }
+        this.updateStats();
+    }
+
+    submitDocument() {
+        // Save first if needed
+        const { isValid, errors, data } = this.formManager.validateForm();
+        if (!isValid) { this.showToast(`필수 항목을 입력해주세요: ${errors.join(', ')}`, 'error'); return; }
+        const user = this.auth.getCurrentUser();
+        if (!user) return;
+
+        let docId = this.editingDocId;
+        if (!docId) {
+            const doc = this.store.save(this.formManager.currentFormType, data, user);
+            docId = doc.id;
+        } else {
+            this.store.update(docId, data);
+        }
+
+        const result = this.store.submit(docId);
+        if (result.success) {
+            this.showToast('📤 문서가 결재 제출되었습니다.', 'success');
+            this.editingDocId = null;
+            this.formManager.setFormType(this.formManager.currentFormType);
+            this.formManager.renderForm(document.getElementById('formEditorBody'));
+            this.updateStats();
+            this.updatePendingBadge();
+        } else {
+            this.showToast(result.error, 'error');
+        }
+    }
+
+    // ============================================
+    // 내 문서 관리
+    // ============================================
+    renderMyDocs() {
+        const container = document.getElementById('myDocsContainer');
+        if (!container) return;
+        const user = this.auth.getCurrentUser();
+        if (!user) return;
+        const docs = this.store.getByUser(user.id);
+
+        const statusIcons = { '작성중': '✏️', '제출': '📤', '승인': '✅', '반려': '❌' };
+        const statusClass = { '작성중': 'draft', '제출': 'submitted', '승인': 'approved', '반려': 'rejected' };
+
+        container.innerHTML = `
+      <div class="mydocs-summary">
+        <span>전체 ${docs.length}건</span>
+        <span class="doc-count draft">작성중 ${docs.filter(d => d.status === '작성중').length}</span>
+        <span class="doc-count submitted">제출 ${docs.filter(d => d.status === '제출').length}</span>
+        <span class="doc-count approved">승인 ${docs.filter(d => d.status === '승인').length}</span>
+        <span class="doc-count rejected">반려 ${docs.filter(d => d.status === '반려').length}</span>
+      </div>
+      ${docs.length === 0 ? '<div class="mydocs-empty">작성한 문서가 없습니다. ⚡ 실전 모드에서 결의서를 작성해보세요.</div>' :
+                `<div class="mydocs-list">
+          ${docs.map(doc => {
+                    const formDef = FORM_FIELDS[doc.formType];
+                    return `<div class="mydoc-card ${statusClass[doc.status]}">
+              <div class="mydoc-status"><span class="status-badge ${statusClass[doc.status]}">${statusIcons[doc.status]} ${doc.status}</span></div>
+              <div class="mydoc-info">
+                <span class="mydoc-type">${formDef?.title || doc.formType}</span>
+                <span class="mydoc-desc">${doc.data.description || doc.data.incomeDesc || doc.data.subDesc || '-'}</span>
+                ${doc.data.amount ? `<span class="mydoc-amount">${parseInt(doc.data.amount).toLocaleString()}원</span>` : ''}
+              </div>
+              <div class="mydoc-meta">
+                <span>작성: ${new Date(doc.createdAt).toLocaleDateString('ko-KR')}</span>
+                <span>수정: ${new Date(doc.updatedAt).toLocaleDateString('ko-KR')}</span>
+                ${doc.approvalComment ? `<span class="mydoc-comment">💬 ${doc.approvalComment}</span>` : ''}
+              </div>
+              <div class="mydoc-actions">
+                ${(doc.status === '작성중' || doc.status === '반려') ?
+                            `<button class="btn btn-sm btn-outline" data-action="edit" data-id="${doc.id}">✏️ 수정</button>` : ''}
+                ${doc.status === '작성중' ?
+                            `<button class="btn btn-sm btn-primary" data-action="submit" data-id="${doc.id}">📤 제출</button>
+                  <button class="btn btn-sm btn-danger" data-action="delete" data-id="${doc.id}">🗑 삭제</button>` : ''}
+              </div>
+            </div>`;
+                }).join('')}
+        </div>`}`;
+
+        // Bind events
+        container.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
+                const id = btn.dataset.id;
+                if (action === 'edit') this.editDocument(id);
+                else if (action === 'submit') {
+                    const result = this.store.submit(id);
+                    if (result.success) {
+                        this.showToast('📤 제출되었습니다.', 'success');
+                        this.renderMyDocs();
+                        this.updatePendingBadge();
+                    } else this.showToast(result.error, 'error');
+                } else if (action === 'delete') {
+                    if (confirm('정말 삭제하시겠습니까?')) {
+                        const result = this.store.delete(id);
+                        if (result.success) {
+                            this.showToast('🗑 삭제되었습니다.', 'success');
+                            this.renderMyDocs();
+                            this.updateStats();
+                        } else this.showToast(result.error, 'error');
+                    }
+                }
+            });
+        });
+    }
+
+    editDocument(docId) {
+        const doc = this.store.getById(docId);
+        if (!doc) return;
+        this.editingDocId = docId;
+        this.formManager.setFormType(doc.formType);
+
+        // Switch to production tab
+        this.switchTab('production');
+
+        // Activate correct resolution type button
+        document.querySelectorAll('.resolution-type-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.type === doc.formType);
+        });
+        const titleEl = document.getElementById('formEditorTitle');
+        if (titleEl) titleEl.textContent = (FORM_FIELDS[doc.formType]?.title || '') + ' (수정중)';
+
+        // Render and fill form
+        this.formManager.renderForm(document.getElementById('formEditorBody'));
+        // Fill in saved data
+        setTimeout(() => {
+            Object.entries(doc.data).forEach(([key, value]) => {
+                const el = document.getElementById(`field_${key}`);
+                if (el) {
+                    el.value = value;
+                    el.dispatchEvent(new Event('input'));
+                }
+            });
+        }, 50);
+    }
+
+    // ============================================
+    // 기간별 엑셀 내보내기
+    // ============================================
+    exportFiltered() {
+        const startDate = document.getElementById('exportStart')?.value || '';
+        const endDate = document.getElementById('exportEnd')?.value || '';
+        const status = document.getElementById('exportStatus')?.value || '전체';
+
+        const docs = this.store.getFiltered({ startDate, endDate, status });
+        if (docs.length === 0) {
+            this.showToast('해당 기간/상태의 문서가 없습니다.', 'error');
+            return;
+        }
+
+        const records = docs.map(doc => this.formManager.mapFormToExcelRow(doc.data));
+        this.formManager.exportAsExcel(null, records);
+        this.showToast(`📊 ${docs.length}건 내보내기 완료`, 'success');
+    }
+
+    // ============================================
+    // 증빙 가이드
+    // ============================================
     renderDocGuide() {
         const container = document.getElementById('docGrid');
         if (!container) return;
@@ -163,12 +479,13 @@ class App {
         if (modal) modal.style.display = 'none';
     }
 
-    // ======== 2025 지출내역 참조 테이블 ========
+    // ============================================
+    // 2025 지출내역 참조 테이블
+    // ============================================
     renderExpenseReference() {
         const container = document.getElementById('expenseRefContainer');
         if (!container || this.expenseData.length === 0) return;
 
-        // Summary stats
         const totalAmount = this.expenseData.reduce((sum, r) => sum + (parseInt(r.amount) || 0), 0);
         const categories = {};
         this.expenseData.forEach(r => {
@@ -247,7 +564,9 @@ class App {
         }).join('');
     }
 
-    // ======== Form Actions ========
+    // ============================================
+    // Form Actions (legacy)
+    // ============================================
     previewForm() {
         const { isValid, errors, data } = this.formManager.validateForm();
         if (!isValid) { this.showToast(`필수 항목을 입력해주세요: ${errors.join(', ')}`, 'error'); return; }
