@@ -1025,6 +1025,8 @@ body {
   border: 1px solid #ccc;
   padding: 8px 12px;
   font-size: 0.85rem;
+  color: #1a1a1a;
+  background: #fff;
 }
 
 .preview-table th {
@@ -1032,15 +1034,18 @@ body {
   font-weight: 600;
   text-align: left;
   width: 130px;
+  color: #333;
 }
 
 .preview-table.compact th {
   width: 100px;
   font-size: 0.8rem;
+  color: #333;
 }
 
 .preview-table.compact td {
   font-size: 0.8rem;
+  color: #1a1a1a;
 }
 
 /* --- Document Guide (Clickable Cards) --- */

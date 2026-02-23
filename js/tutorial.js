@@ -81,7 +81,7 @@ class TutorialEngine {
           </div>` : ''}
           ${step.docTypes ? `
           <div class="step-doc-types">
-            <h4>📄 결의서 유형</h4>
+            <h4>📄 청구(결의)서 유형</h4>
             ${Object.entries(step.docTypes).map(([name, info]) => `
               <div style="margin:8px 0;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;">
                 <div style="font-weight:600;color:var(--primary);">${name}</div>
@@ -266,7 +266,7 @@ class TutorialEngine {
             </div>` : ''}
           ${step.formType ? `
             <div class="sim-form-hint">
-              <span>📄 이 단계에서 <strong>${step.formType === 'expense_resolution' ? '지출결의서' : step.formType === 'income_resolution' ? '수입결의서' : '대체결의서'}</strong>를 작성합니다.</span>
+              <span>📄 이 단계에서 <strong>${step.formType === 'expense_resolution' ? '지출 청구(결의)서' : step.formType === 'income_resolution' ? '수입결의서' : '대체결의서'}</strong>를 작성합니다.</span>
               <button class="btn btn-primary btn-sm" id="goToForm" data-type="${step.formType}">양식 작성하기 →</button>
             </div>` : ''}
           ${step.formFields ? `
