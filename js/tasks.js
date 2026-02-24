@@ -50,7 +50,18 @@ class TaskManager {
                     1500, 'Tasks Load'
                 );
                 if (error) throw error;
-                return data || [];
+                // v5.2.13: Data Normalization (DB 대소문자 차이 극복)
+                return (data || []).map(row => ({
+                    id: row.id,
+                    text: row.text,
+                    status: row.status,
+                    userid: row.userid || row.userId,
+                    workflowid: row.workflowid || row.workflowId,
+                    memo: row.memo,
+                    createdat: row.createdat || row.createdAt,
+                    createdatfull: row.createdatfull || row.createdAtFull,
+                    date: row.date
+                }));
             } catch (e) {
                 console.warn('⚠️ [Tasks] Cloud Load failed, using local fallback:', e.message);
             }
@@ -174,11 +185,16 @@ class TaskManager {
         if (this.channel) this.channel.unsubscribe();
 
         this.channel = this.supabase
-            .channel('task-sync-main') // 간결한 고유 채널
+            .channel('task-sync-main')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
-                console.log('📡 [Realtime] Tasks Updated:', payload);
-                window.app?.showToast('🔄 팀 업무가 실시간 업데이트되었습니다.', 'info');
-                if (this.container) this.render(this.container);
+                console.log('📡 [Realtime Payload Check]:', payload);
+                const newData = payload.new;
+                if (newData && newData.date === this.currentDate) {
+                    window.app?.showToast(`🔄 [${newData.userid}] 팀 업무 실시간 업데이트`, 'info');
+                    if (this.container) this.render(this.container);
+                } else {
+                    console.log('🔈 [Realtime] Item for different date ignored.');
+                }
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
                 console.log('📡 [Realtime] Comments Updated:', payload);
