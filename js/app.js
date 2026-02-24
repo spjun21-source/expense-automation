@@ -156,7 +156,8 @@ class App {
         if (endInput) endInput.value = today;
 
         // Initial renders
-        this.tutorial.init(document.getElementById('workflowContainer'));
+        await this.tutorial.init(document.getElementById('workflowContainer'), user.id);
+        this.formManager.init(user.id);
         this.tutorial.renderScenarios(document.getElementById('scenarioGrid'));
         this.formManager.renderForm(document.getElementById('formEditorBody'));
         this.renderDocGuide();

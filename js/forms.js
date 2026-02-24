@@ -3,19 +3,49 @@
 // ============================================================
 
 import { FORM_FIELDS, EXCEL_COLUMNS } from './data.js';
+import { supabase, initSupabase } from './supabase.js';
 
 class FormManager {
   constructor() {
     this.currentFormType = 'expense_resolution';
     this.formData = {};
     this.generatedDocs = 0;
-    this.loadDocCount();
+    this.userId = null;
+    this.supabase = initSupabase();
   }
 
-  loadDocCount() {
+  init(userId) {
+    this.userId = userId;
+    this.loadDocCount(this.supabase, this.userId);
+  }
+
+  async loadDocCount(supabase, userId) {
+    if (supabase && userId) {
+      try {
+        const { data, error } = await supabase
+          .from('user_progress')
+          .select('docCount')
+          .eq('userId', userId)
+          .single();
+        if (!error && data) {
+          this.generatedDocs = data.docCount || 0;
+          return;
+        }
+      } catch (e) { }
+    }
     try { this.generatedDocs = parseInt(localStorage.getItem('expense_doc_count') || '0'); } catch (e) { }
   }
-  saveDocCount() { localStorage.setItem('expense_doc_count', String(this.generatedDocs)); }
+
+  async saveDocCount(supabase, userId) {
+    localStorage.setItem('expense_doc_count', String(this.generatedDocs));
+    if (supabase && userId) {
+      try {
+        await supabase
+          .from('user_progress')
+          .upsert({ userId, docCount: this.generatedDocs }, { onConflict: 'userId' });
+      } catch (e) { }
+    }
+  }
 
   setFormType(type) { this.currentFormType = type; this.formData = {}; }
 
@@ -145,7 +175,7 @@ class FormManager {
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
     this.generatedDocs++;
-    this.saveDocCount();
+    this.saveDocCount(this.supabase, this.userId);
     window.app?.updateStats();
   }
 

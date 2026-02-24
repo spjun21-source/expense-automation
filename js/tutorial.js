@@ -3,19 +3,24 @@
 // ============================================================
 
 import { WORKFLOW_STEPS, SCENARIOS, OVERALL_OVERVIEW } from './data.js';
+import { initSupabase } from './supabase.js';
 
 class TutorialEngine {
   constructor() {
+    this.userId = null;
+    this.supabase = initSupabase();
     this.progress = { completedSteps: [], quizResults: {}, completedScenarios: [] };
     this.currentScenario = null;
     this.currentStep = 0;
     this.container = null;
     this.searchTerm = '';
-    this.loadProgress();
   }
 
-  init(container) {
+  async init(container, userId) {
     this.container = container;
+    this.userId = userId;
+    await this.loadProgress();
+    this._setupRealtime();
     this.renderWorkflow(this.container);
     this._bindEvents();
     this.bindQuizEvents(this.container);
@@ -74,15 +79,60 @@ class TutorialEngine {
     modal.onclick = (e) => { if (e.target === modal) closeModal(); };
   }
 
-  loadProgress() {
+  _setupRealtime() {
+    if (!this.supabase || !this.userId) return;
+    this.supabase
+      .channel('public:user_progress')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_progress', filter: `userId=eq.${this.userId}` }, async payload => {
+        console.log('🔄 Tutorial Progress Sync Received:', payload);
+        if (payload.new) {
+          this.progress = payload.new.tutorialProgress;
+          this.renderWorkflow(this.container);
+          if (this.currentScenario) this.renderSimulation(document.getElementById('panelPractice'));
+          if (window.app) window.app.updateStats();
+        }
+      })
+      .subscribe();
+  }
+
+  async loadProgress() {
+    if (this.supabase && this.userId) {
+      try {
+        const { data, error } = await this.supabase
+          .from('user_progress')
+          .select('tutorialProgress')
+          .eq('userId', this.userId)
+          .single();
+        if (!error && data) {
+          this.progress = data.tutorialProgress;
+          return;
+        }
+      } catch (e) { }
+    }
+
+    // Fallback to localStorage
     try {
-      const saved = localStorage.getItem('expense_tutorial_progress');
+      const saved = localStorage.getItem(`expense_tutorial_progress_${this.userId}`);
       if (saved) this.progress = JSON.parse(saved);
     } catch (e) { }
   }
 
-  saveProgress() {
-    localStorage.setItem('expense_tutorial_progress', JSON.stringify(this.progress));
+  async saveProgress() {
+    if (this.userId) {
+      localStorage.setItem(`expense_tutorial_progress_${this.userId}`, JSON.stringify(this.progress));
+
+      if (this.supabase) {
+        try {
+          await this.supabase
+            .from('user_progress')
+            .upsert({
+              userId: this.userId,
+              tutorialProgress: this.progress,
+              updatedAt: new Date().toISOString()
+            }, { onConflict: 'userId' });
+        } catch (e) { }
+      }
+    }
   }
 
   // ======== 학습 모드: 업무 절차 렌더링 ========
