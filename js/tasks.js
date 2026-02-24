@@ -155,16 +155,23 @@ class TaskManager {
     _setupRealtime() {
         if (!this.supabase) return;
 
-        this.supabase
-            .channel('public:tasks')
+        const channel = this.supabase
+            .channel(`public:tasks:${Date.now()}`) // 고유 채널 ID 사용
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
-                console.log('🔄 Cloud Update Received:', payload);
+                console.log('🔔 [Realtime] Tasks Updated:', payload);
                 if (this.container) this.render(this.container);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
+                console.log('🔔 [Realtime] Comments Updated:', payload);
                 if (this.container) this.render(this.container);
             })
-            .subscribe();
+            .subscribe((status) => {
+                console.log(`📡 [Realtime] Subscription Status: ${status}`);
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('❌ [Realtime] Subscription failed. Check if Realtime is enabled in Supabase Dashboard.');
+                    window.app?.showToast('⚠️ 실시간 연결 오류. 설정 확인 필요.', 'error');
+                }
+            });
     }
 
     // ---- 데이터 관리 ----

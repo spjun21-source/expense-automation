@@ -15,13 +15,16 @@ const SUPABASE_CONFIG = {
 let supabaseClient = null;
 
 function initSupabase() {
-    // CDN에서 로드된 전역 supabase 객체 확인
+    // 1. 이미 클라이언트가 생성되어 있다면 재사용 (싱글톤)
+    if (supabaseClient) return supabaseClient;
+
+    // 2. CDN에서 로드된 전역 supabase 객체 확인
     if (typeof window.supabase === 'undefined') {
         console.error('Supabase SDK not loaded yet. Check index.html script tag.');
         return null;
     }
 
-    // Placeholder 체크
+    // 3. Placeholder 체크
     if (SUPABASE_CONFIG.URL === 'YOUR_SUPABASE_PROJECT_URL' || !SUPABASE_CONFIG.URL) {
         console.warn('Supabase URL/Key가 설정되지 않았습니다. 로컬 모드로 동작합니다.');
         return null;
@@ -30,7 +33,7 @@ function initSupabase() {
     try {
         // 전역 객체(window.supabase)로부터 클라이언트 생성
         supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
-        console.log('✅ Supabase Cloud Connected');
+        console.log('✅ [Supabase] Singleton Client Initialized');
         return supabaseClient;
     } catch (e) {
         console.error('Supabase Connection Error:', e);
