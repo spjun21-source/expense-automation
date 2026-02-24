@@ -28,7 +28,7 @@ class ApprovalManager {
   _renderDocCard(doc) {
     const formDef = FORM_FIELDS[doc.formType];
     const title = formDef?.title || doc.formType;
-    const dateStr = new Date(doc.createdAt).toLocaleDateString('ko-KR');
+    const dateStr = new Date(doc.createdat || doc.createdAt).toLocaleDateString('ko-KR');
     return `
       <div class="approval-card" data-doc-id="${doc.id}">
         <div class="approval-card-header">

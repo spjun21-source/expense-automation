@@ -460,8 +460,8 @@ class App {
                 ${doc.data.amount ? `<span class="mydoc-amount">${parseInt(doc.data.amount).toLocaleString()}원</span>` : ''}
               </div>
               <div class="mydoc-meta">
-                <span>작성: ${new Date(doc.createdAt).toLocaleDateString('ko-KR')}</span>
-                <span>수정: ${new Date(doc.updatedAt).toLocaleDateString('ko-KR')}</span>
+                <span>작성: ${new Date(doc.createdat || doc.createdAt).toLocaleDateString('ko-KR')}</span>
+                <span>수정: ${new Date(doc.updatedat || doc.updatedAt).toLocaleDateString('ko-KR')}</span>
                 ${doc.approvalComment ? `<span class="mydoc-comment">💬 ${doc.approvalComment}</span>` : ''}
               </div>
               <div class="mydoc-actions">

@@ -128,7 +128,7 @@ class TutorialEngine {
             .upsert({
               userId: this.userId,
               tutorialProgress: this.progress,
-              updatedAt: new Date().toISOString()
+              updatedat: new Date().toISOString()
             }, { onConflict: 'userId' });
         } catch (e) { }
       }

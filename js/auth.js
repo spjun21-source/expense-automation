@@ -206,7 +206,7 @@ class AuthManager {
                 .from('users')
                 .update({
                     ...data,
-                    updatedAt: new Date().toISOString()
+                    updatedat: new Date().toISOString()
                 })
                 .eq('id', userId);
             if (error) return { success: false, error: '수정 중 오류가 발생했습니다.' };
