@@ -23,26 +23,32 @@ class AuthManager {
     async _initBootstrap() {
         if (!this.supabase) return;
         try {
-            // Check if admin explicitly exists
-            const { data: adminUser } = await this.supabase
+            // 1. admin 계정 존재 여부 확인
+            const { data: adminUser, error: checkError } = await this.supabase
                 .from('users')
                 .select('id')
                 .eq('id', 'admin')
-                .single();
+                .maybeSingle();
 
+            if (checkError) throw checkError;
+
+            // 2. admin이 없으면 기본 계정들 로드
             if (!adminUser) {
-                console.log('🚀 Cloud Bootstrap: Adding default admin and users');
-                // Insert entire default list to be safe, using upsert or checking count
+                console.log('🚀 [Auth] Admin missing. Bootstrapping cloud users...');
                 const { count } = await this.supabase.from('users').select('*', { count: 'exact', head: true });
+
                 if (count === 0) {
                     await this.supabase.from('users').insert(DEFAULT_USERS);
+                    console.log('✅ [Auth] All default users added to cloud.');
                 } else {
-                    // Just add admin if missing
                     await this.supabase.from('users').insert(DEFAULT_USERS.find(u => u.id === 'admin'));
+                    console.log('✅ [Auth] Admin account restored in cloud.');
                 }
+            } else {
+                console.log('✅ [Auth] Admin account verified in cloud.');
             }
         } catch (e) {
-            console.error('Bootstrap error:', e);
+            console.error('❌ [Auth] Bootstrap failed:', e.message);
         }
     }
 
