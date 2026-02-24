@@ -17,7 +17,10 @@ class TaskManager {
     }
 
     _todayStr() {
-        return new Date().toISOString().split('T')[0];
+        const d = new Date();
+        const offset = d.getTimezoneOffset() * 60000;
+        const local = new Date(d.getTime() - offset);
+        return local.toISOString().split('T')[0];
     }
 
     _storageKey(date) {
@@ -28,7 +31,7 @@ class TaskManager {
         return `daily_comment_shared_${date || this.currentDate}`;
     }
 
-    async _withTimeout(promise, ms = 1500, name = 'Task Query') {
+    async _withTimeout(promise, ms = 2000, name = 'Task Query') {
         return Promise.race([
             promise,
             new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} Timeout`)), ms))
@@ -169,6 +172,7 @@ class TaskManager {
             .channel(`public:tasks:${Date.now()}`) // 고유 채널 ID 사용
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
                 console.log('🔔 [Realtime] Tasks Updated:', payload);
+                window.app?.showToast('📡 팀 업무가 실시간 업데이트되었습니다.', 'info');
                 if (this.container) this.render(this.container);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
@@ -180,6 +184,8 @@ class TaskManager {
                 if (status === 'CHANNEL_ERROR') {
                     console.error('❌ [Realtime] Subscription failed. Check if Realtime is enabled in Supabase Dashboard.');
                     window.app?.showToast('⚠️ 실시간 연결 오류. 설정 확인 필요.', 'error');
+                } else if (status === 'SUBSCRIBED') {
+                    console.log('✅ Realtime Active');
                 }
             });
     }
