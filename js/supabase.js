@@ -8,7 +8,7 @@
  */
 const SUPABASE_CONFIG = {
     URL: 'https://uiffoznjdltiqxwhiwi.supabase.co',
-    ANON_KEY: 'sb_publishable_9K7CY3Ov5PSrcmUiKGFpEA_IGAqnwun'
+    ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpZmZvem5mamRsdGlxeHdoaXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MDg3NjEsImV4cCI6MjA4NzQ4NDc2MX0.aBthoW9n9YiC0zYKgSMBToJkDu2uLb9BPPVb2RNHB0Y'
 };
 
 // Supabase 클라이언트 인스턴스
