@@ -1,7 +1,13 @@
-// 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
-// ============================================================
+const APP_VERSION = 'v5.2.16';
 
-const APP_VERSION = 'v5.2.15';
+// [v5.2.16 Global Error Catcher]
+window.onerror = function (msg, url, line) {
+    alert(`🔴 [Runtime Error] ${msg}\nLine: ${line}\nURL: ${url}`);
+    return false;
+};
+window.onunhandledrejection = function (event) {
+    alert(`🔴 [Promise Error] ${event.reason}`);
+};
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -26,6 +32,7 @@ class App {
     }
 
     async init() {
+        console.log('🚀 App Initialization Started');
         // 1. 즉시 필요한 UI 이벤트 바인딩 (로그인 전후 무관)
         this._bindStaticEvents();
 
@@ -85,6 +92,7 @@ class App {
         const loginError = document.getElementById('loginError');
 
         const doLogin = async () => {
+            console.log('Btn-Login: Clicked');
             if (loginBtn) {
                 loginBtn.disabled = true;
                 loginBtn.textContent = '로그인 중...';

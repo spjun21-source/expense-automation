@@ -604,8 +604,8 @@ class TaskManager {
         });
     }
 
-    _showMemoEditor(container, taskId, ownerId) {
-        const tasks = this._load(this.currentDate);
+    async _showMemoEditor(container, taskId, ownerId) {
+        const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         const currentMemo = task?.memo || '';
 
