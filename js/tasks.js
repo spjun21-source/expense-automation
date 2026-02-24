@@ -392,6 +392,10 @@ class TaskManager {
                 <option value="전체" ${this.filterUserId === '전체' ? 'selected' : ''}>👥 팀 전체</option>
                 ${this.allUserIds.map(uid => `<option value="${uid}" ${this.filterUserId === uid ? 'selected' : ''}>${uid}</option>`).join('')}
               </select>` : ''}
+            <div class="sync-status-badge ${this.supabase ? 'online' : 'offline'}" title="${this.supabase ? 'Cloud Linked' : 'Local Only'}">
+                ${this.supabase ? '☁️' : '🚫'}
+            </div>
+            <button class="tasks-nav-btn" id="taskRefreshCloud" title="서버 데이터 새로고침">🔄</button>
             <button class="tasks-nav-btn" id="taskPrevDate">◀</button>
             <span class="tasks-date ${isToday ? 'today' : ''}">${dateDisplay}</span>
             <button class="tasks-nav-btn" id="taskNextDate" ${isToday ? 'disabled' : ''}>▶</button>
@@ -571,6 +575,11 @@ class TaskManager {
             this.nextDate();
             this.render(container);
         });
+
+        // 클라우드 새로고침
+        container.querySelector('#taskRefreshCloud')?.addEventListener('click', () => {
+            this.forceRefresh();
+        });
     }
 
     _showMemoEditor(container, taskId, ownerId) {
@@ -609,8 +618,6 @@ class TaskManager {
         editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
         memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
         editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
-        const btnRefresh = container.querySelector('#taskRefreshCloud');
-        btnRefresh?.addEventListener('click', () => this.forceRefresh());
     }
 }
 
