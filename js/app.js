@@ -1,7 +1,7 @@
 // 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
 
-const APP_VERSION = 'v5.1.8';
+const APP_VERSION = 'v5.1.9';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
