@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.2.2">
+  <link rel="stylesheet" href="css/style.css?v=5.2.3">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -22,7 +22,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.2</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.3</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -254,17 +254,17 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="js/supabase.js?v=5.2.2"></script>
-  <script type="module" src="js/app.js?v=5.2.2"></script>
+  <script type="module" src="js/supabase.js?v=5.2.3"></script>
+  <script type="module" src="js/app.js?v=5.2.3"></script>
   <script>
-    // [v5.2.2 Failsafe] 7초 이상 메인 화면이 안 뜨면 강제 로드 유도
+    // [v5.2.3 Failsafe] 7초 이상 메인 화면이 안 뜨면 강제 로드 유도
     setTimeout(() => {
       const mainApp = document.getElementById('mainApp');
       const loginOverlay = document.getElementById('loginOverlay');
       if (mainApp && mainApp.style.display === 'none' && loginOverlay && loginOverlay.style.display === 'none') {
         console.warn('⚠️ Dashboard load hang detected. Forcing display.');
         mainApp.style.display = 'block';
-        document.body.innerHTML += '<div style="position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;" onclick="location.reload(true)">화면이 멈췄나요? [새로고침]</div>';
+        document.body.innerHTML += '<div style="position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;" onclick="localStorage.clear(); location.reload(true)">시스템 먹통 해결 (캐시 강제 삭제)</div>';
       }
     }, 7000);
   </script>

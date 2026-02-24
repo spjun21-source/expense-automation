@@ -11,10 +11,21 @@ class TaskManager {
         this.allUserIds = options.allUserIds || [userId];
         this.filterUserId = '전체';
 
-        // Cloud Sync properties
         this.supabase = initSupabase();
         this.container = null;
         this._setupRealtime();
+    }
+
+    _todayStr() {
+        return new Date().toISOString().split('T')[0];
+    }
+
+    _storageKey(date) {
+        return `daily_tasks_shared_${date || this.currentDate}`;
+    }
+
+    _commentKey(date) {
+        return `daily_comment_shared_${date || this.currentDate}`;
     }
 
     async _withTimeout(promise, ms = 1500, name = 'Task Query') {
@@ -91,14 +102,17 @@ class TaskManager {
     async _loadComment(date) {
         if (this.supabase) {
             try {
-                const { data, error } = await this.supabase
-                    .from('task_comments')
-                    .select('*')
-                    .eq('date', date || this.currentDate)
-                    .order('updatedAt', { ascending: false })
-                    .limit(1);
+                const { data, error } = await this._withTimeout(
+                    this.supabase.from('task_comments').select('*')
+                        .eq('date', date || this.currentDate)
+                        .order('updatedAt', { ascending: false })
+                        .limit(1),
+                    1000, 'Comment Load'
+                );
                 if (!error && data && data.length > 0) return data[0].content;
-            } catch (e) { }
+            } catch (e) {
+                console.warn('⚠️ [Tasks] Comment load failed:', e.message);
+            }
         }
         return localStorage.getItem(this._commentKey(date)) || '';
     }
