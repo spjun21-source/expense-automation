@@ -15,21 +15,22 @@ const SUPABASE_CONFIG = {
 let supabase = null;
 
 function initSupabase() {
-    if (typeof supabasejs === 'undefined') {
+    if (typeof supabase === 'undefined') {
         console.error('Supabase SDK not loaded yet.');
         return null;
     }
 
     // Placeholder 체크
-    if (SUPABASE_CONFIG.URL === 'YOUR_SUPABASE_PROJECT_URL') {
+    if (SUPABASE_CONFIG.URL === 'YOUR_SUPABASE_PROJECT_URL' || !SUPABASE_CONFIG.URL) {
         console.warn('Supabase URL/Key가 설정되지 않았습니다. 로컬 모드로 동작합니다.');
         return null;
     }
 
     try {
-        supabase = supabasejs.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
+        // v2 SDK uses supabase.createClient
+        const client = supabase.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
         console.log('✅ Supabase Cloud Connected');
-        return supabase;
+        return client;
     } catch (e) {
         console.error('Supabase Connection Error:', e);
         return null;

@@ -25,29 +25,42 @@ class App {
     }
 
     async init() {
+        // Bind UI events that don't depend on login first
+        this._bindStaticEvents();
+
         // Check existing session
         if (this.auth.isLoggedIn()) {
-            this._showApp();
+            await this._showApp();
         } else {
             this._showLogin();
         }
         this._bindLoginEvents();
     }
 
+    _bindStaticEvents() {
+        // Tab navigation
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+    }
+
     // ============================================
     // Login / Logout
     // ============================================
     _showLogin() {
-        document.getElementById('loginOverlay').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
+        const loginOverlay = document.getElementById('loginOverlay');
+        const mainApp = document.getElementById('mainApp');
+        if (loginOverlay) loginOverlay.style.display = 'flex';
+        if (mainApp) mainApp.style.display = 'none';
     }
 
-    _showApp() {
+    async _showApp() {
         const loginOverlay = document.getElementById('loginOverlay');
         const mainApp = document.getElementById('mainApp');
         if (loginOverlay) loginOverlay.style.display = 'none';
         if (mainApp) mainApp.style.display = 'block';
-        this._initApp();
+
+        await this._initApp();
         this.switchTab(this.currentTab);
     }
 
@@ -114,20 +127,10 @@ class App {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
 
-        // Logout
-        document.getElementById('logoutBtn')?.addEventListener('click', () => {
-            this.auth.logout();
-            this.editingDocId = null;
-            this._showLogin();
-        });
-
         // Load 2025 expense data
         await this.loadExpenseData();
 
-        // Tab navigation
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
-        });
+        // Resolution type selector
 
         // Resolution type selector
         document.querySelectorAll('.resolution-type-btn').forEach(btn => {
