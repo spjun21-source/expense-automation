@@ -87,20 +87,36 @@ class AuthManager {
     // ---- 공개 API ----
     async login(userId, password) {
         let user = null;
+        let systemError = null;
+
         if (this.supabase) {
-            const { data, error } = await this.supabase
-                .from('users')
-                .select('*')
-                .eq('id', userId)
-                .eq('password', password)
-                .single();
-            if (!error && data) user = data;
+            try {
+                const { data, error } = await this.supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', userId)
+                    .eq('password', password)
+                    .maybeSingle(); // single() 대신 maybeSingle()로 에러 분리
+
+                if (error) {
+                    console.error('❌ [Auth] Supabase Login Error:', error);
+                    systemError = `시스템 오류: ${error.message} (테이블 존재 여부 확인 필요)`;
+                } else if (data) {
+                    user = data;
+                }
+            } catch (err) {
+                console.error('❌ [Auth] Fatal Login Exception:', err);
+                systemError = '네트워크 또는 서버 연결 오류가 발생했습니다.';
+            }
         } else {
+            console.warn('⚠️ [Auth] Supabase not connected. Falling back to LocalStorage.');
             const users = this._getLocalUsers();
             user = users.find(u => u.id === userId && u.password === password);
         }
 
+        if (systemError) return { success: false, error: systemError };
         if (!user) return { success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
+
         this._saveSession(user);
         return { success: true, user: this._session };
     }
