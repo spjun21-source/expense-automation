@@ -234,15 +234,18 @@ class TaskManager {
                 const { error } = await this.supabase.from('tasks').insert(task);
                 if (error) {
                     console.error('Cloud Insert Error:', error);
-                    window.app?.showToast(`⚠️ 서버 저장 실패: ${error.message}`, 'error');
+                    window.app?.showToast(`❌ 서버 저장 거부됨: ${error.message}`, 'error');
+                    return null;
+                } else {
+                    console.log('✅ Cloud Sync Success:', task.id);
+                    window.app?.showToast('✅ 서버 동기화 완료', 'success');
                 }
             } catch (e) {
                 console.warn('⚠️ Cloud Sync failed:', e.message);
-                window.app?.showToast('⚠️ 클라우드 네트워크 연결 오류', 'warning');
+                window.app?.showToast('⚠️ 클라우드 통신 실패 (오프라인 상동)', 'warning');
             }
         }
 
-        window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
         if (this.container) this.render(this.container);
         return task;
     }
@@ -393,7 +396,9 @@ class TaskManager {
                 <option value="전체" ${this.filterUserId === '전체' ? 'selected' : ''}>👥 팀 전체</option>
                 ${this.allUserIds.map(uid => `<option value="${uid}" ${this.filterUserId === uid ? 'selected' : ''}>${uid}</option>`).join('')}
               </select>` : ''}
-            <div class="sync-status-badge ${this.supabase ? 'online' : 'offline'}" title="${this.supabase ? 'Cloud Linked' : 'Local Only'}">
+            <div class="sync-status-badge ${this.supabase ? 'online' : 'offline'}" 
+                 onclick="console.log('Sync Date:', '${this.currentDate}', 'User:', '${this.userId}')"
+                 title="Date: ${this.currentDate} / User: ${this.userId}">
                 ${this.supabase ? '☁️' : '🚫'}
             </div>
             <button class="tasks-nav-btn" id="taskRefreshCloud" title="서버 데이터 새로고침">🔄</button>
