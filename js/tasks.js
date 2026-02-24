@@ -68,13 +68,17 @@ class TaskManager {
             // For now, we sync the whole day's tasks to keep logic consistent.
             // Note: In production, we'd upsert individually.
             try {
-                // Warning: This overwrite logic is simple for demo/prototype.
-                // In full production, we'd use a more granular sync.
                 const { error } = await this.supabase
                     .from('tasks')
                     .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
-                if (error) console.error('Supabase Sync Error:', error);
-            } catch (e) { console.error(e); }
+                if (error) {
+                    console.error('Supabase Sync Error:', error);
+                    window.app?.showToast('⚠️ 클라우드 동기화 실패 (DB 설정 확인 필요)', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                window.app?.showToast('⚠️ 클라우드 연결 오류', 'error');
+            }
         }
 
         this._showSavedIndicator();
@@ -85,7 +89,7 @@ class TaskManager {
 
         if (this.supabase) {
             try {
-                await this.supabase
+                const { error } = await this.supabase
                     .from('task_comments')
                     .upsert({
                         date: date || this.currentDate,
@@ -93,7 +97,13 @@ class TaskManager {
                         userId: this.userId,
                         updatedAt: new Date().toISOString()
                     }, { onConflict: 'date,userId' });
-            } catch (e) { console.error(e); }
+                if (error) {
+                    console.error('Comment Sync Error:', error);
+                    window.app?.showToast('⚠️ 비고 동기화 실패', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         this._showSavedIndicator();
