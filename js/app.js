@@ -159,17 +159,32 @@ class App {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
 
-        // Update Cloud Indicator
+        // Update Cloud Indicator (v5.1.7 Real Validation)
         const cloudIndicator = document.getElementById('cloudIndicator');
-        if (cloudIndicator) {
-            if (this.auth.supabase) {
-                cloudIndicator.className = 'cloud-indicator online';
-                cloudIndicator.querySelector('.status-text').textContent = 'Cloud Connected';
-            } else {
-                cloudIndicator.className = 'cloud-indicator offline';
-                cloudIndicator.querySelector('.status-text').textContent = 'Cloud Offline (LocalStorage)';
+        const updateStatus = async () => {
+            if (cloudIndicator) {
+                if (this.auth.supabase) {
+                    try {
+                        const { error } = await this.auth.supabase.from('users').select('id').limit(1);
+                        if (error) throw error;
+                        cloudIndicator.className = 'cloud-indicator online';
+                        cloudIndicator.querySelector('.status-text').textContent = 'Cloud Connected';
+                    } catch (e) {
+                        cloudIndicator.className = 'cloud-indicator offline';
+                        let msg = 'Cloud Error (Key check failed)';
+                        const curKey = this.auth.supabase.supabaseKey || '';
+                        if (curKey.startsWith('sb_publishable')) {
+                            msg = 'Cloud Error (Stripe Key Detected)';
+                        }
+                        cloudIndicator.querySelector('.status-text').textContent = msg;
+                    }
+                } else {
+                    cloudIndicator.className = 'cloud-indicator offline';
+                    cloudIndicator.querySelector('.status-text').textContent = 'Cloud Offline (LocalStorage)';
+                }
             }
-        }
+        };
+        updateStatus();
         // Resolution type selector
         document.querySelectorAll('.resolution-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {
