@@ -1,13 +1,4 @@
-const APP_VERSION = 'v5.2.16';
-
-// [v5.2.16 Global Error Catcher]
-window.onerror = function (msg, url, line) {
-    alert(`🔴 [Runtime Error] ${msg}\nLine: ${line}\nURL: ${url}`);
-    return false;
-};
-window.onunhandledrejection = function (event) {
-    alert(`🔴 [Promise Error] ${event.reason}`);
-};
+const APP_VERSION = 'v5.2.17';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';

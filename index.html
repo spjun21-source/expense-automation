@@ -11,18 +11,30 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.2.16">
+  <link rel="stylesheet" href="css/style.css?v=5.2.17">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+  <script>
+    // [v5.2.17 Early Diagnostic]
+    window.onerror = function (msg, url, line, col, error) {
+      alert("🔴 시스템 초기화 오류 발생!\n\n메시지: " + msg + "\n위치: " + url + ":" + line + (col ? ":" + col : ""));
+      return false;
+    };
+    window.onunhandledrejection = function (event) {
+      alert("🔴 비동기 처리 오류 발생!\n\n원인: " + (event.reason ? event.reason.message || event.reason : "알 수 없음"));
+    };
+    console.log("🚀 [System] Diagnostic initialization complete.");
+  </script>
+
   <!-- Login Modal -->
   <div class="login-overlay" id="loginOverlay">
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.16</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.17</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -187,56 +199,57 @@
             <h3>📄 미리보기</h3>
           </div>
           <div id="previewContent" class="preview-content"></div>
-        </div </section>
+        </div>
+      </section>
 
-        <!-- 문서 관리 -->
-        <section class="tab-panel" id="panelMyDocs">
-          <div class="section-header">
-            <h2 class="section-title">📋 내 문서 관리</h2>
-            <p class="section-subtitle">작성한 결의서를 조회·수정·삭제·제출할 수 있습니다.</p>
+      <!-- 문서 관리 -->
+      <section class="tab-panel" id="panelMyDocs">
+        <div class="section-header">
+          <h2 class="section-title">📋 내 문서 관리</h2>
+          <p class="section-subtitle">작성한 결의서를 조회·수정·삭제·제출할 수 있습니다.</p>
+        </div>
+        <div id="myDocsContainer"></div>
+      </section>
+
+      <!-- 결재/관리 (관리자 전용) -->
+      <section class="tab-panel admin-only" id="panelAdmin" style="display:none;">
+        <div class="section-header">
+          <h2 class="section-title">🔐 결재 & 관리</h2>
+          <p class="section-subtitle">제출된 문서를 결재하고, 사용자를 관리합니다.</p>
+        </div>
+
+        <!-- Export with date range -->
+        <div class="export-panel">
+          <h3>📊 기간별 엑셀 내보내기</h3>
+          <div class="export-controls">
+            <label>시작일 <input type="date" id="exportStart" class="form-input"></label>
+            <label>종료일 <input type="date" id="exportEnd" class="form-input"></label>
+            <label>상태
+              <select id="exportStatus" class="form-select">
+                <option value="전체">전체</option>
+                <option value="승인">승인</option>
+                <option value="반려">반려</option>
+                <option value="제출">제출</option>
+                <option value="작성중">작성중</option>
+              </select>
+            </label>
+            <button class="btn btn-success btn-sm" id="btnExportFiltered">📊 내보내기</button>
           </div>
-          <div id="myDocsContainer"></div>
-        </section>
+        </div>
 
-        <!-- 결재/관리 (관리자 전용) -->
-        <section class="tab-panel admin-only" id="panelAdmin" style="display:none;">
-          <div class="section-header">
-            <h2 class="section-title">🔐 결재 & 관리</h2>
-            <p class="section-subtitle">제출된 문서를 결재하고, 사용자를 관리합니다.</p>
-          </div>
+        <div id="approvalContainer"></div>
+        <div id="approvalHistoryContainer" style="margin-top:32px;"></div>
+        <div id="userMgmtContainer" style="margin-top:32px;"></div>
+      </section>
 
-          <!-- Export with date range -->
-          <div class="export-panel">
-            <h3>📊 기간별 엑셀 내보내기</h3>
-            <div class="export-controls">
-              <label>시작일 <input type="date" id="exportStart" class="form-input"></label>
-              <label>종료일 <input type="date" id="exportEnd" class="form-input"></label>
-              <label>상태
-                <select id="exportStatus" class="form-select">
-                  <option value="전체">전체</option>
-                  <option value="승인">승인</option>
-                  <option value="반려">반려</option>
-                  <option value="제출">제출</option>
-                  <option value="작성중">작성중</option>
-                </select>
-              </label>
-              <button class="btn btn-success btn-sm" id="btnExportFiltered">📊 내보내기</button>
-            </div>
-          </div>
-
-          <div id="approvalContainer"></div>
-          <div id="approvalHistoryContainer" style="margin-top:32px;"></div>
-          <div id="userMgmtContainer" style="margin-top:32px;"></div>
-        </section>
-
-        <!-- 증빙 가이드 -->
-        <section class="tab-panel" id="panelReference">
-          <div class="section-header">
-            <h2 class="section-title">📚 증빙서류 가이드</h2>
-            <p class="section-subtitle">경비 처리에 필요한 증빙서류 유형과 용도를 안내합니다. 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
-          </div>
-          <div class="doc-grid" id="docGrid"></div>
-        </section>
+      <!-- 증빙 가이드 -->
+      <section class="tab-panel" id="panelReference">
+        <div class="section-header">
+          <h2 class="section-title">📚 증빙서류 가이드</h2>
+          <p class="section-subtitle">경비 처리에 필요한 증빙서류 유형과 용도를 안내합니다. 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
+        </div>
+        <div class="doc-grid" id="docGrid"></div>
+      </section>
     </main>
   </div>
 
@@ -254,17 +267,21 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="js/supabase.js?v=5.2.16"></script>
-  <script type="module" src="js/app.js?v=5.2.16"></script>
+  <script type="module" src="js/supabase.js?v=5.2.17"></script>
+  <script type="module" src="js/app.js?v=5.2.17"></script>
   <script>
-    // [v5.2.16 Failsafe] 7초 이상 메인 화면이 안 뜨면 강제 로드 유도
+    // [v5.2.17 Failsafe] 7초 이상 메인 화면이 안 뜨면 강제 로드 유도
     setTimeout(() => {
       const mainApp = document.getElementById('mainApp');
       const loginOverlay = document.getElementById('loginOverlay');
-      if (mainApp && mainApp.style.display === 'none' && loginOverlay && loginOverlay.style.display === 'none') {
+      if (mainApp && mainApp.style.display === 'none' && loginOverlay && (loginOverlay.style.display === 'none' || loginOverlay.style.display === '')) {
         console.warn('⚠️ Dashboard load hang detected. Forcing display.');
-        mainApp.style.display = 'block';
-        document.body.innerHTML += '<div style="position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;" onclick="localStorage.clear(); location.reload(true)">시스템 먹통 해결 (캐시 강제 삭제)</div>';
+        const btn = document.createElement('div');
+        btn.id = 'emergency-fix-btn';
+        btn.style = 'position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+        btn.innerHTML = '⚙️ 시스템 강제 복구 (캐시 삭제)';
+        btn.onclick = () => { localStorage.clear(); location.reload(true); };
+        document.body.appendChild(btn);
       }
     }, 7000);
   </script>
