@@ -95,8 +95,8 @@ class DocumentStore {
             status: '작성중',
             authorId: author.id,
             authorName: author.name,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdat: new Date().toISOString(),
+            updatedat: new Date().toISOString(),
             approvalComment: '',
             approvedBy: '',
             approvedAt: null
@@ -113,7 +113,7 @@ class DocumentStore {
             return { success: false, error: `'${doc.status}' 상태의 문서는 수정할 수 없습니다.` };
         }
         doc.data = { ...newData };
-        doc.updatedAt = new Date().toISOString();
+        doc.updatedat = new Date().toISOString();
         if (doc.status === '반려') {
             doc.status = '작성중';
             doc.approvalComment = '';
@@ -146,7 +146,7 @@ class DocumentStore {
             return { success: false, error: `'${doc.status}' 상태에서는 제출할 수 없습니다.` };
         }
         doc.status = '제출';
-        doc.updatedAt = new Date().toISOString();
+        doc.updatedat = new Date().toISOString();
         await this._persist(doc);
         return { success: true, doc };
     }
@@ -160,7 +160,7 @@ class DocumentStore {
         doc.approvedBy = adminUser.name;
         doc.approvedAt = new Date().toISOString();
         doc.approvalComment = comment;
-        doc.updatedAt = new Date().toISOString();
+        doc.updatedat = new Date().toISOString();
         await this._persist(doc);
         return { success: true, doc };
     }
@@ -173,7 +173,7 @@ class DocumentStore {
         doc.approvedBy = adminUser.name;
         doc.approvedAt = new Date().toISOString();
         doc.approvalComment = comment;
-        doc.updatedAt = new Date().toISOString();
+        doc.updatedat = new Date().toISOString();
         await this._persist(doc);
         return { success: true, doc };
     }
