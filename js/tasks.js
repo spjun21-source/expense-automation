@@ -5,7 +5,7 @@ import { initSupabase } from './supabase.js';
 
 class TaskManager {
     constructor(userId, options = {}) {
-        this.userId = userId;
+        this.userid = userId;
         this.currentDate = this._todayStr();
         this.isAdmin = options.isAdmin || false;
         this.allUserIds = options.allUserIds || [userId];
@@ -99,9 +99,9 @@ class TaskManager {
                     .upsert({
                         date: date || this.currentDate,
                         content: comment || '',
-                        userId: this.userId,
-                        updatedAt: new Date().toISOString()
-                    }, { onConflict: 'date,userId' });
+                        userid: this.userid,
+                        updatedat: new Date().toISOString()
+                    }, { onConflict: 'date,userid' });
                 if (error) {
                     console.error('Comment Sync Error:', error);
                     window.app?.showToast('⚠️ 비고 동기화 실패', 'error');
@@ -120,7 +120,7 @@ class TaskManager {
                 const { data, error } = await this._withTimeout(
                     this.supabase.from('task_comments').select('*')
                         .eq('date', date || this.currentDate)
-                        .order('updatedAt', { ascending: false })
+                        .order('updatedat', { ascending: false })
                         .limit(1),
                     1000, 'Comment Load'
                 );
@@ -200,7 +200,7 @@ class TaskManager {
         const allTasks = await this._load(this.currentDate);
         this.syncStatus = 'SYNCED';
         if (this.isAdmin && this.filterUserId !== '전체') {
-            return allTasks.filter(t => t.userId === this.filterUserId);
+            return allTasks.filter(t => t.userid === this.filterUserId);
         }
         return allTasks;
     }
@@ -213,13 +213,13 @@ class TaskManager {
             text: text.trim(),
             status: '대기',
             memo: '',
-            createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-            createdAtFull: now.toLocaleString('ko-KR', {
+            createdat: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            createdatfull: now.toLocaleString('ko-KR', {
                 year: 'numeric', month: '2-digit', day: '2-digit',
                 hour: '2-digit', minute: '2-digit'
             }),
-            userId: this.userId,
-            workflowId: workflowId,
+            userid: this.userid,
+            workflowid: workflowId,
             date: this.currentDate
         };
 
@@ -233,8 +233,8 @@ class TaskManager {
             try {
                 const { error } = await this.supabase.from('tasks').insert(task);
                 if (error) {
-                    console.error('Cloud Insert Error:', error);
-                    window.app?.showToast(`❌ 서버 저장 거부됨: ${error.message}`, 'error');
+                    console.error('❌ [Supabase Error Details]:', JSON.stringify(error, null, 2));
+                    window.app?.showToast(`❌ 서버 저장 거부됨: ${error.message} (${error.code || 'No Code'})`, 'error');
                     return null;
                 } else {
                     console.log('✅ Cloud Sync Success:', task.id);
@@ -479,21 +479,21 @@ class TaskManager {
     _renderTask(task, editable) {
         const statusIcons = { '대기': '⬜', '진행': '🔄', '완료': '✅' };
         const statusClass = { '대기': 'waiting', '진행': 'progress', '완료': 'done' };
-        const isOwn = task.userId === this.userId;
+        const isOwn = task.userid === this.userid;
         const canEdit = editable && (isOwn || this.isAdmin);
         const hasMemo = task.memo && task.memo.trim();
-        const workflow = task.workflowId ? WORKFLOW_STEPS.find(s => s.id === task.workflowId) : null;
+        const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
 
         return `
-      <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userId}">
-        <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userId}" title="상태 변경">
+      <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userid}">
+        <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userid}" title="상태 변경">
           ${statusIcons[task.status]}
         </button>
         <div class="task-main-content">
           <div class="task-meta-top">
-            <span class="task-author-badge ${isOwn ? 'own' : ''}">${task.userId}</span>
+            <span class="task-author-badge ${isOwn ? 'own' : ''}">${task.userid}</span>
             ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
-            <span class="task-full-time" title="생성 일시">${task.createdAtFull || task.createdAt}</span>
+            <span class="task-full-time" title="생성 일시">${task.createdatfull || task.createdat}</span>
           </div>
           <div class="task-text-row">
             <span class="task-text ${task.status === '완료' ? 'completed' : ''}">${task.text}</span>
