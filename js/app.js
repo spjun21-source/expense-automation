@@ -18,7 +18,7 @@ class App {
         this.formManager = new FormManager();
         this.approvalMgr = new ApprovalManager(this.store);
         this.taskMgr = null; // initialized after login
-        this.currentTab = 'tutorial';
+        this.currentTab = 'production';
         this.expenseData = [];
         this.editingDocId = null; // for edit mode
         this.init();
@@ -43,9 +43,12 @@ class App {
     }
 
     _showApp() {
-        document.getElementById('loginOverlay').style.display = 'none';
-        document.getElementById('mainApp').style.display = 'block';
+        const loginOverlay = document.getElementById('loginOverlay');
+        const mainApp = document.getElementById('mainApp');
+        if (loginOverlay) loginOverlay.style.display = 'none';
+        if (mainApp) mainApp.style.display = 'block';
         this._initApp();
+        this.switchTab(this.currentTab);
     }
 
     _bindLoginEvents() {
