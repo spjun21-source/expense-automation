@@ -22,7 +22,8 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화</h2>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.1.1</span>
+        </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
       <div class="login-form">
@@ -35,7 +36,13 @@
           <input type="password" class="form-input" id="loginPw" placeholder="비밀번호 입력" autocomplete="current-password">
         </div>
         <div class="login-error" id="loginError"></div>
-        <button class="btn btn-primary login-btn" id="loginBtn">로그인</button>
+        <button class="btn btn-primary btn-block" id="loginBtn">로그인</button>
+        <p id="loginError" class="error-msg"></p>
+        <div style="margin-top: 20px; text-align: center; border-top: 1px solid var(--border); padding-top: 15px;">
+          <button class="btn btn-sm btn-outline"
+            onclick="if(confirm('모든 캐시와 데이터를 초기화하고 최신 버전을 불러옵니다. 진행할까요?')){ localStorage.clear(); location.reload(true); }"
+            style="font-size: 0.75rem; color: var(--text-dim);">🔄 시스템 버전 강제 동기화 (캐시 삭제)</button>
+        </div>
       </div>
       <div class="login-hint">
         <p>관리자: admin / admin1234</p>
