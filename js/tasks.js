@@ -269,9 +269,9 @@ class TaskManager {
         return this.getTasks();
     }
 
-    getStatsByUser() {
+    async getStatsByUser() {
         const result = {};
-        const allTasks = this._load(this.currentDate);
+        const allTasks = await this._load(this.currentDate);
 
         this.allUserIds.forEach(uid => {
             const userTasks = allTasks.filter(t => t.userId === uid);
@@ -299,7 +299,7 @@ class TaskManager {
         // 관리자용 사용자별 칩
         let userChipsHtml = '';
         if (this.isAdmin) {
-            const byUser = this.getStatsByUser();
+            const byUser = await this.getStatsByUser();
             const entries = Object.entries(byUser).filter(([, s]) => s.total > 0 || this.filterUserId === '전체');
             userChipsHtml = `<div class="task-user-summary">
                 ${entries.map(([uid, s]) => `
