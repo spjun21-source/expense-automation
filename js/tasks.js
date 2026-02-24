@@ -50,7 +50,7 @@ class TaskManager {
                     1500, 'Tasks Load'
                 );
                 if (error) throw error;
-                // v5.2.13: Data Normalization (DB 대소문자 차이 극복)
+                // v5.2.14: Data Normalization (DB 대소문자 차이 극복)
                 return (data || []).map(row => ({
                     id: row.id,
                     text: row.text,
@@ -190,7 +190,7 @@ class TaskManager {
                 console.log('📡 [Realtime Payload Check]:', payload);
                 const newData = payload.new;
                 if (newData && newData.date === this.currentDate) {
-                    window.app?.showToast(`🔄 [${newData.userid}] 팀 업무 실시간 업데이트`, 'info');
+                    window.app?.showToast(`🔄 [${newData.userid || newData.userId}] 팀 업무 실시간 업데이트`, 'info');
                     if (this.container) this.render(this.container);
                 } else {
                     console.log('🔈 [Realtime] Item for different date ignored.');
