@@ -1,22 +1,65 @@
-// ============================================================
-// 사업단 경비 처리 자동화 - Document Store Module (v5)
-// ============================================================
+import { supabase, initSupabase } from './supabase.js';
 
 const DOC_STORAGE_KEY = 'expense_documents';
 
 class DocumentStore {
     constructor() {
-        this._docs = this._load();
+        this.supabase = initSupabase();
+        this._docs = this._loadLocal();
+        this._loadCloud(); // Async cloud load
+        this._setupRealtime();
     }
 
-    _load() {
+    _setupRealtime() {
+        if (!this.supabase) return;
+        this.supabase
+            .channel('public:documents')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, async payload => {
+                console.log('🔄 Document Sync Received:', payload);
+                await this._loadCloud();
+                window.dispatchEvent(new CustomEvent('docs-updated'));
+            })
+            .subscribe();
+    }
+
+    _loadLocal() {
         try {
             return JSON.parse(localStorage.getItem(DOC_STORAGE_KEY) || '[]');
         } catch { return []; }
     }
 
-    _persist() {
+    async _loadCloud() {
+        if (!this.supabase) return;
+        try {
+            const { data, error } = await this.supabase
+                .from('documents')
+                .select('*')
+                .order('updatedAt', { ascending: false });
+            if (!error && data) {
+                this._docs = data;
+                // Sync to local for offline/fallback
+                localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(this._docs));
+            }
+        } catch (e) {
+            console.error('Document Cloud Load Error:', e);
+        }
+    }
+
+    async _persist(doc) {
+        // Local persist (full list)
         localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(this._docs));
+
+        // Cloud persist (individual document upsert)
+        if (this.supabase && doc) {
+            try {
+                const { error } = await this.supabase
+                    .from('documents')
+                    .upsert(doc, { onConflict: 'id' });
+                if (error) console.error('Document Cloud Sync Error:', error);
+            } catch (e) {
+                console.error(e);
+            }
+        }
     }
 
     _genId() {
@@ -24,7 +67,7 @@ class DocumentStore {
     }
 
     // ---- CRUD ----
-    save(formType, data, author) {
+    async save(formType, data, author) {
         const doc = {
             id: this._genId(),
             formType,
@@ -36,14 +79,14 @@ class DocumentStore {
             updatedAt: new Date().toISOString(),
             approvalComment: '',
             approvedBy: '',
-            approvedAt: ''
+            approvedAt: null
         };
         this._docs.push(doc);
-        this._persist();
+        await this._persist(doc);
         return doc;
     }
 
-    update(docId, newData) {
+    async update(docId, newData) {
         const doc = this._docs.find(d => d.id === docId);
         if (!doc) return { success: false, error: '문서를 찾을 수 없습니다.' };
         if (doc.status !== '작성중' && doc.status !== '반려') {
@@ -55,22 +98,28 @@ class DocumentStore {
             doc.status = '작성중';
             doc.approvalComment = '';
         }
-        this._persist();
+        await this._persist(doc);
         return { success: true, doc };
     }
 
-    delete(docId) {
+    async delete(docId) {
         const doc = this._docs.find(d => d.id === docId);
         if (!doc) return { success: false, error: '문서를 찾을 수 없습니다.' };
         if (doc.status !== '작성중') {
             return { success: false, error: `'${doc.status}' 상태의 문서는 삭제할 수 없습니다.` };
         }
+
+        if (this.supabase) {
+            const { error } = await this.supabase.from('documents').delete().eq('id', docId);
+            if (error) return { success: false, error: '삭제 중 오류가 발생했습니다.' };
+        }
+
         this._docs = this._docs.filter(d => d.id !== docId);
-        this._persist();
+        localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(this._docs));
         return { success: true };
     }
 
-    submit(docId) {
+    async submit(docId) {
         const doc = this._docs.find(d => d.id === docId);
         if (!doc) return { success: false, error: '문서를 찾을 수 없습니다.' };
         if (doc.status !== '작성중') {
@@ -78,12 +127,12 @@ class DocumentStore {
         }
         doc.status = '제출';
         doc.updatedAt = new Date().toISOString();
-        this._persist();
+        await this._persist(doc);
         return { success: true, doc };
     }
 
     // ---- 결재 처리 ----
-    approve(docId, adminUser, comment = '') {
+    async approve(docId, adminUser, comment = '') {
         const doc = this._docs.find(d => d.id === docId);
         if (!doc) return { success: false, error: '문서를 찾을 수 없습니다.' };
         if (doc.status !== '제출') return { success: false, error: '제출 상태의 문서만 승인할 수 있습니다.' };
@@ -92,11 +141,11 @@ class DocumentStore {
         doc.approvedAt = new Date().toISOString();
         doc.approvalComment = comment;
         doc.updatedAt = new Date().toISOString();
-        this._persist();
+        await this._persist(doc);
         return { success: true, doc };
     }
 
-    reject(docId, adminUser, comment = '') {
+    async reject(docId, adminUser, comment = '') {
         const doc = this._docs.find(d => d.id === docId);
         if (!doc) return { success: false, error: '문서를 찾을 수 없습니다.' };
         if (doc.status !== '제출') return { success: false, error: '제출 상태의 문서만 반려할 수 있습니다.' };
@@ -105,7 +154,7 @@ class DocumentStore {
         doc.approvedAt = new Date().toISOString();
         doc.approvalComment = comment;
         doc.updatedAt = new Date().toISOString();
-        this._persist();
+        await this._persist(doc);
         return { success: true, doc };
     }
 

@@ -168,6 +168,18 @@ class App {
             this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
         }
         this.updateStats();
+
+        // Cloud Document Refresh
+        window.addEventListener('docs-updated', () => {
+            console.log('📢 UI Refresh: Documents Updated in Cloud');
+            if (this.currentTab === 'mydocs') this.renderMyDocs();
+            if (this.currentTab === 'admin' && this.auth.isAdmin()) {
+                this.approvalMgr.renderPendingList(document.getElementById('approvalContainer'));
+                this.approvalMgr.renderHistory(document.getElementById('approvalHistoryContainer'));
+            }
+            this.updatePendingBadge();
+            this.updateStats();
+        });
     }
 
     async loadExpenseData() {
@@ -245,28 +257,28 @@ class App {
     // ============================================
     // 문서 저장 / 제출
     // ============================================
-    saveDocument() {
+    async saveDocument() {
         const { isValid, errors, data } = this.formManager.validateForm();
         if (!isValid) { this.showToast(`필수 항목을 입력해주세요: ${errors.join(', ')}`, 'error'); return; }
         const user = this.auth.getCurrentUser();
         if (!user) return;
 
         if (this.editingDocId) {
-            const result = this.store.update(this.editingDocId, data);
+            const result = await this.store.update(this.editingDocId, data);
             if (result.success) {
                 this.showToast('💾 문서가 수정·저장되었습니다.', 'success');
             } else {
                 this.showToast(result.error, 'error');
             }
         } else {
-            const doc = this.store.save(this.formManager.currentFormType, data, user);
+            const doc = await this.store.save(this.formManager.currentFormType, data, user);
             this.editingDocId = doc.id;
             this.showToast('💾 문서가 저장되었습니다. (상태: 작성중)', 'success');
         }
-        this.updateStats();
+        await this.updateStats();
     }
 
-    submitDocument() {
+    async submitDocument() {
         // Save first if needed
         const { isValid, errors, data } = this.formManager.validateForm();
         if (!isValid) { this.showToast(`필수 항목을 입력해주세요: ${errors.join(', ')}`, 'error'); return; }
@@ -275,13 +287,13 @@ class App {
 
         let docId = this.editingDocId;
         if (!docId) {
-            const doc = this.store.save(this.formManager.currentFormType, data, user);
+            const doc = await this.store.save(this.formManager.currentFormType, data, user);
             docId = doc.id;
         } else {
-            this.store.update(docId, data);
+            await this.store.update(docId, data);
         }
 
-        const result = this.store.submit(docId);
+        const result = await this.store.submit(docId);
         if (result.success) {
             this.showToast('📤 문서가 결재 제출되었습니다.', 'success');
             this.editingDocId = null;
@@ -349,20 +361,22 @@ class App {
                 const id = btn.dataset.id;
                 if (action === 'edit') this.editDocument(id);
                 else if (action === 'submit') {
-                    const result = this.store.submit(id);
-                    if (result.success) {
-                        this.showToast('📤 제출되었습니다.', 'success');
-                        this.renderMyDocs();
-                        this.updatePendingBadge();
-                    } else this.showToast(result.error, 'error');
+                    this.store.submit(id).then(result => {
+                        if (result.success) {
+                            this.showToast('📤 제출되었습니다.', 'success');
+                            this.renderMyDocs();
+                            this.updatePendingBadge();
+                        } else this.showToast(result.error, 'error');
+                    });
                 } else if (action === 'delete') {
                     if (confirm('정말 삭제하시겠습니까?')) {
-                        const result = this.store.delete(id);
-                        if (result.success) {
-                            this.showToast('🗑 삭제되었습니다.', 'success');
-                            this.renderMyDocs();
-                            this.updateStats();
-                        } else this.showToast(result.error, 'error');
+                        this.store.delete(id).then(result => {
+                            if (result.success) {
+                                this.showToast('🗑 삭제되었습니다.', 'success');
+                                this.renderMyDocs();
+                                this.updateStats();
+                            } else this.showToast(result.error, 'error');
+                        });
                     }
                 }
             });

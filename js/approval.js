@@ -69,7 +69,7 @@ class ApprovalManager {
 
   _bindApprovalEvents(container) {
     container.querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const action = btn.dataset.action;
         const id = btn.dataset.id;
 
@@ -86,9 +86,9 @@ class ApprovalManager {
 
         let result;
         if (action === 'approve') {
-          result = this.store.approve(id, adminUser, comment);
+          result = await this.store.approve(id, adminUser, comment);
         } else if (action === 'reject') {
-          result = this.store.reject(id, adminUser, comment);
+          result = await this.store.reject(id, adminUser, comment);
         }
 
         if (result?.success) {
