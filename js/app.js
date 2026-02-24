@@ -1,25 +1,34 @@
-const APP_VERSION = 'v5.2.17';
+const APP_VERSION = 'v5.2.18';
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
-import { TutorialEngine } from './tutorial.js';
-import { FormManager } from './forms.js';
-import { AuthManager } from './auth.js';
-import { DocumentStore } from './store.js';
-import { TaskManager } from './tasks.js';
-import { ApprovalManager } from './approval.js';
+console.log('📦 [Module Load] app.js started');
+
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.18';
+import { TutorialEngine } from './tutorial.js?v=5.2.18';
+import { FormManager } from './forms.js?v=5.2.18';
+import { AuthManager } from './auth.js?v=5.2.18';
+import { DocumentStore } from './store.js?v=5.2.18';
+import { TaskManager } from './tasks.js?v=5.2.18';
+import { ApprovalManager } from './approval.js?v=5.2.18';
 
 class App {
     constructor() {
-        this.auth = new AuthManager();
-        this.store = new DocumentStore();
-        this.tutorial = new TutorialEngine();
-        this.formManager = new FormManager();
-        this.approvalMgr = new ApprovalManager(this.store);
-        this.taskMgr = null; // initialized after login
-        this.currentTab = 'production';
-        this.expenseData = [];
-        this.editingDocId = null; // for edit mode
-        this.init();
+        console.log('⚡ [App] Constructor started');
+        try {
+            this.auth = new AuthManager();
+            this.store = new DocumentStore();
+            this.tutorial = new TutorialEngine();
+            this.formManager = new FormManager();
+            this.approvalMgr = new ApprovalManager(this.store);
+            this.taskMgr = null;
+            this.currentTab = 'production';
+            this.expenseData = [];
+            this.editingDocId = null;
+            console.log('⚡ [App] Managers initialized. Calling init()...');
+            this.init();
+        } catch (err) {
+            console.error('🛑 [App] Critical Constructor Error:', err);
+            alert(`🛑 시스템 초기화 및 매니저 로드 실패: ${err.message}`);
+        }
     }
 
     async init() {
@@ -734,5 +743,14 @@ class App {
     }
 }
 
-const app = new App();
-window.app = app;
+// Startup
+try {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🎉 [DOM] Ready. Launching App...');
+        const app = new App();
+        window.app = app;
+    });
+} catch (startupErr) {
+    console.error('🛑 [Startup] Fatal error:', startupErr);
+    alert('🛑 어플리케이션 시작 실패: ' + startupErr.message);
+}

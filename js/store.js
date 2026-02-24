@@ -31,8 +31,16 @@ class DocumentStore {
 
     _loadLocal() {
         try {
-            return JSON.parse(localStorage.getItem(DOC_STORAGE_KEY) || '[]');
-        } catch { return []; }
+            const local = JSON.parse(localStorage.getItem(DOC_STORAGE_KEY) || '[]');
+            return local.map(d => ({
+                ...d,
+                createdat: d.createdat || d.createdAt || new Date().toISOString(),
+                updatedat: d.updatedat || d.updatedAt || new Date().toISOString()
+            })).sort((a, b) => (b.updatedat || '').localeCompare(a.updatedat || ''));
+        } catch (e) {
+            console.error('Local Load Error:', e);
+            return [];
+        }
     }
 
     async _loadCloud() {
@@ -41,7 +49,7 @@ class DocumentStore {
             const { data, error } = await this._withTimeout(
                 this.supabase.from('documents')
                     .select('*')
-                    .order('updatedAt', { ascending: false }),
+                    .order('updatedat', { ascending: false }),
                 2000, 'Store Load'
             );
             if (!error && data) {
@@ -59,14 +67,17 @@ class DocumentStore {
         localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(this._docs));
 
         // Cloud persist (individual document upsert)
-        if (this.supabase && doc) {
+        if (this.supabase) {
             try {
                 const { error } = await this.supabase
                     .from('documents')
-                    .upsert(doc, { onConflict: 'id' });
-                if (error) console.error('Document Cloud Sync Error:', error);
+                    .upsert({
+                        ...doc,
+                        updatedat: new Date().toISOString()
+                    });
+                if (error) console.error('Cloud Sync Error:', error);
             } catch (e) {
-                console.error(e);
+                console.error('Cloud Save Fatal:', e);
             }
         }
     }

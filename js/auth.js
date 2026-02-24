@@ -224,7 +224,7 @@ class AuthManager {
     }
 
     getUserCount() {
-        return this._getUsers().length;
+        return this._getLocalUsers().length;
     }
 }
 
