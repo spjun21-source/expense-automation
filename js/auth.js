@@ -48,7 +48,8 @@ class AuthManager {
                 console.log('✅ [Auth] Admin account verified in cloud.');
             }
         } catch (e) {
-            console.error('❌ [Auth] Bootstrap failed:', e.message);
+            console.error('❌ [Auth] Bootstrap failed (Network Error?):', e.message);
+            // 부트스트랩 실패 시에도 앱은 계속 진행 (로컬 모드)
         }
     }
 
@@ -100,13 +101,20 @@ class AuthManager {
 
                 if (error) {
                     console.error('❌ [Auth] Supabase Login Error:', error);
-                    systemError = `시스템 오류: ${error.message} (테이블 존재 여부 확인 필요)`;
+                    // 특정 오류가 아닌 'Failed to fetch' 등의 네트워크 오류인 경우 로컬 폴백 유도
+                    if (error.message === 'Failed to fetch' || error.status === 0) {
+                        throw new Error('Network failure');
+                    }
+                    systemError = `시스템 오류: ${error.message}`;
                 } else if (data) {
                     user = data;
                 }
             } catch (err) {
-                console.error('❌ [Auth] Fatal Login Exception:', err);
-                systemError = '네트워크 또는 서버 연결 오류가 발생했습니다.';
+                console.error('❌ [Auth] Fatal Login Exception (Falling back):', err);
+                // 네트워크 오류 발생 시 로컬로 전환하여 로그인 시도
+                const users = this._getLocalUsers();
+                user = users.find(u => u.id === userId && u.password === password);
+                if (!user) systemError = '네트워크 연결 실패 및 로컬 계정 정보 없음';
             }
         } else {
             console.warn('⚠️ [Auth] Supabase not connected. Falling back to LocalStorage.');
@@ -114,7 +122,7 @@ class AuthManager {
             user = users.find(u => u.id === userId && u.password === password);
         }
 
-        if (systemError) return { success: false, error: systemError };
+        if (systemError && !user) return { success: false, error: systemError };
         if (!user) return { success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
 
         this._saveSession(user);
