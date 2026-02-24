@@ -7,8 +7,8 @@
  * 프로젝트 생성 후 Settings > API 메뉴에서 확인 가능합니다.
  */
 const SUPABASE_CONFIG = {
-    URL: 'YOUR_SUPABASE_PROJECT_URL', // 예: https://xyz.supabase.co
-    ANON_KEY: 'YOUR_SUPABASE_ANON_KEY' // 예: eyJhbGciOiJIUzI1...
+    URL: 'https://uiffoznjdltiqxwhiwi.supabase.co',
+    ANON_KEY: 'sb_publishable_9K7CY3Ov5PSrcmUiKGFpEA_IGAqnwun'
 };
 
 // Supabase 클라이언트 초기화 (CDN 로드 후 실행됨)
