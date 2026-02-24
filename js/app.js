@@ -1,7 +1,7 @@
 // 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
 
-const APP_VERSION = 'v5.2.14';
+const APP_VERSION = 'v5.2.15';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -85,14 +85,28 @@ class App {
         const loginError = document.getElementById('loginError');
 
         const doLogin = async () => {
-            const result = await this.auth.login(loginId.value, loginPw.value);
-            if (result.success) {
-                loginError.textContent = '';
-                loginId.value = '';
-                loginPw.value = '';
-                this._showApp();
-            } else {
-                loginError.textContent = result.error;
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.textContent = '로그인 중...';
+            }
+            try {
+                const result = await this.auth.login(loginId.value, loginPw.value);
+                if (result.success) {
+                    loginError.textContent = '';
+                    loginId.value = '';
+                    loginPw.value = '';
+                    await this._showApp();
+                } else {
+                    loginError.textContent = result.error;
+                }
+            } catch (err) {
+                console.error('Login UI Crash:', err);
+                loginError.textContent = `오류: ${err.message}`;
+            } finally {
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = '로그인';
+                }
             }
         };
 

@@ -4,11 +4,11 @@ import { WORKFLOW_STEPS } from './data.js';
 import { initSupabase } from './supabase.js';
 
 class TaskManager {
-    constructor(userId, options = {}) {
-        this.userid = userId;
+    constructor(userid, options = {}) {
+        this.userid = userid;
         this.currentDate = this._todayStr();
         this.isAdmin = options.isAdmin || false;
-        this.allUserIds = options.allUserIds || [userId];
+        this.allUserIds = options.allUserIds || [userid];
         this.filterUserId = '전체';
 
         this.supabase = initSupabase();
@@ -46,7 +46,7 @@ class TaskManager {
                 const { data, error } = await this._withTimeout(
                     this.supabase.from('tasks').select('*')
                         .eq('date', date || this.currentDate)
-                        .order('createdAt', { ascending: true }),
+                        .order('createdat', { ascending: true }),
                     1500, 'Tasks Load'
                 );
                 if (error) throw error;
@@ -153,7 +153,7 @@ class TaskManager {
         }
     }
 
-    setUser(userId) { this.userId = userId; }
+    setUser(userid) { this.userid = userid; }
 
     setDate(dateStr) { this.currentDate = dateStr; }
 
@@ -277,7 +277,7 @@ class TaskManager {
         if (!task) return null;
 
         // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
+        if (task.userid !== this.userid && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
             return null;
         }
@@ -299,7 +299,7 @@ class TaskManager {
         if (!task) return null;
 
         // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
+        if (task.userid !== this.userid && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
             return null;
         }
@@ -320,7 +320,7 @@ class TaskManager {
         if (!task) return;
 
         // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
+        if (task.userid !== this.userid && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
             return;
         }
@@ -359,7 +359,7 @@ class TaskManager {
         const allTasks = await this._load(this.currentDate);
 
         this.allUserIds.forEach(uid => {
-            const userTasks = allTasks.filter(t => t.userId === uid);
+            const userTasks = allTasks.filter(t => t.userid === uid);
             result[uid] = this.getStatsByData(userTasks);
         });
         return result;
@@ -413,8 +413,8 @@ class TaskManager {
                 ${this.allUserIds.map(uid => `<option value="${uid}" ${this.filterUserId === uid ? 'selected' : ''}>${uid}</option>`).join('')}
               </select>` : ''}
             <div class="sync-status-badge ${this.supabase ? 'online' : 'offline'}" 
-                 onclick="console.log('Sync Date:', '${this.currentDate}', 'User:', '${this.userId}')"
-                 title="Date: ${this.currentDate} / User: ${this.userId}">
+                 onclick="console.log('Sync Date:', '${this.currentDate}', 'User:', '${this.userid}')"
+                 title="Date: ${this.currentDate} / User: ${this.userid}">
                 ${this.supabase ? '☁️' : '🚫'}
             </div>
             <button class="tasks-nav-btn" id="taskRefreshCloud" title="서버 데이터 새로고침">🔄</button>
@@ -515,10 +515,10 @@ class TaskManager {
             <span class="task-text ${task.status === '완료' ? 'completed' : ''}">${task.text}</span>
           </div>
         </div>
-        <button class="task-memo-btn ${hasMemo ? 'has-memo' : ''}" data-action="memo" data-id="${task.id}" data-owner="${task.userId}" title="${hasMemo ? task.memo : '비고 추가'}">
+        <button class="task-memo-btn ${hasMemo ? 'has-memo' : ''}" data-action="memo" data-id="${task.id}" data-owner="${task.userid}" title="${hasMemo ? task.memo : '비고 추가'}">
           ${hasMemo ? '💬' : '📝'}
         </button>
-        ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userId}" title="삭제">🗑</button>` : ''}
+        ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userid}" title="삭제">🗑</button>` : ''}
       </div>
       ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${task.memo}</div>` : ''}`;
     }
@@ -544,7 +544,7 @@ class TaskManager {
             btn.addEventListener('click', (e) => {
                 const action = btn.dataset.action;
                 const id = btn.dataset.id;
-                const owner = btn.dataset.owner || this.userId;
+                const owner = btn.dataset.owner || this.userid;
 
                 if (action === 'cycle') {
                     this.cycleStatus(id, owner).then(() => this.render(container));
