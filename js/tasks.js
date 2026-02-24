@@ -13,6 +13,7 @@ class TaskManager {
 
         this.supabase = initSupabase();
         this.container = null;
+        this.syncStatus = 'IDLE';
         this._setupRealtime();
     }
 
@@ -168,24 +169,27 @@ class TaskManager {
     _setupRealtime() {
         if (!this.supabase) return;
 
-        const channel = this.supabase
-            .channel(`public:tasks:${Date.now()}`) // 고유 채널 ID 사용
+        // Clean up previous channel if any
+        if (this.channel) this.channel.unsubscribe();
+
+        this.channel = this.supabase
+            .channel('task-sync-main') // 간결한 고유 채널
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
-                console.log('🔔 [Realtime] Tasks Updated:', payload);
-                window.app?.showToast('📡 팀 업무가 실시간 업데이트되었습니다.', 'info');
+                console.log('📡 [Realtime] Tasks Updated:', payload);
+                window.app?.showToast('🔄 팀 업무가 실시간 업데이트되었습니다.', 'info');
                 if (this.container) this.render(this.container);
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
-                console.log('🔔 [Realtime] Comments Updated:', payload);
+                console.log('📡 [Realtime] Comments Updated:', payload);
                 if (this.container) this.render(this.container);
             })
             .subscribe((status) => {
-                console.log(`📡 [Realtime] Subscription Status: ${status}`);
-                if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ [Realtime] Subscription failed. Check if Realtime is enabled in Supabase Dashboard.');
-                    window.app?.showToast('⚠️ 실시간 연결 오류. 설정 확인 필요.', 'error');
-                } else if (status === 'SUBSCRIBED') {
-                    console.log('✅ Realtime Active');
+                this.syncStatus = status;
+                console.log(`📡 [Realtime] Status: ${status}`);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Realtime Connection Established');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.warn('⚠️ Realtime Connection Error. Check SQL Publication settings.');
                 }
             });
     }
@@ -193,6 +197,7 @@ class TaskManager {
     // ---- 데이터 관리 ----
     async getTasks() {
         const allTasks = await this._load(this.currentDate);
+        this.syncStatus = 'SYNCED';
         if (this.isAdmin && this.filterUserId !== '전체') {
             return allTasks.filter(t => t.userId === this.filterUserId);
         }
@@ -201,7 +206,6 @@ class TaskManager {
 
     async addTask(text, workflowId = '') {
         if (!text || !text.trim()) return null;
-        const tasks = await this._load(this.currentDate);
         const now = new Date();
         const task = {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
@@ -217,9 +221,25 @@ class TaskManager {
             workflowId: workflowId,
             date: this.currentDate
         };
+
+        // 1. Local Cache Save
+        const tasks = await this._load(this.currentDate);
         tasks.push(task);
-        await this._save(tasks, this.currentDate);
+        localStorage.setItem(this._storageKey(this.currentDate), JSON.stringify(tasks));
+
+        // 2. Cloud Direct Insert (Trigger Real-time)
+        if (this.supabase) {
+            try {
+                const { error } = await this.supabase.from('tasks').insert(task);
+                if (error) throw error;
+            } catch (e) {
+                console.warn('⚠️ Cloud Sync failed, using local only:', e.message);
+                window.app?.showToast('⚠️ 클라우드 저장 실패 (오프라인 모드)', 'warning');
+            }
+        }
+
         window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
+        if (this.container) this.render(this.container);
         return task;
     }
 
