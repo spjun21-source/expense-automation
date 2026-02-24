@@ -1,7 +1,7 @@
 // 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
 
-const APP_VERSION = 'v5.1.5';
+const APP_VERSION = 'v5.1.6';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -159,6 +159,17 @@ class App {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
 
+        // Update Cloud Indicator
+        const cloudIndicator = document.getElementById('cloudIndicator');
+        if (cloudIndicator) {
+            if (this.auth.supabase) {
+                cloudIndicator.className = 'cloud-indicator online';
+                cloudIndicator.querySelector('.status-text').textContent = 'Cloud Connected';
+            } else {
+                cloudIndicator.className = 'cloud-indicator offline';
+                cloudIndicator.querySelector('.status-text').textContent = 'Cloud Offline (LocalStorage)';
+            }
+        }
         // Resolution type selector
         document.querySelectorAll('.resolution-type-btn').forEach(btn => {
             btn.addEventListener('click', () => {

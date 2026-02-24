@@ -22,7 +22,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.1.5</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.1.6</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -57,8 +57,13 @@
           <p class="app-subtitle">ER 바이오코어 사업단 업무 튜토리얼 & 증빙 관리</p>
         </div>
         <div class="header-right">
-          <span class="header-user" id="headerUser"></span>
-          <span class="header-role" id="headerRole"></span>
+          <div id="cloudIndicator" class="cloud-indicator offline">
+            <span class="dot"></span> <span class="status-text">Cloud Offline</span>
+          </div>
+          <div class="user-info">
+            <span class="header-user" id="headerUser"></span>
+            <span class="header-role" id="headerRole"></span>
+          </div>
           <span class="header-date" id="currentDate"></span>
           <button class="btn btn-sm btn-outline" id="logoutBtn">로그아웃</button>
         </div>

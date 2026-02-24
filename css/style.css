@@ -1690,6 +1690,41 @@ body {
   color: var(--primary);
 }
 
+/* --- Cloud Status Indicator --- */
+.cloud-indicator {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.cloud-indicator.online {
+  background: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.cloud-indicator.offline {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.cloud-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cloud-indicator.online .dot {
+  box-shadow: 0 0 8px currentColor;
+}
+
 /* --- Dashboard Area with Tasks --- */
 .dashboard-area {
   max-width: 1200px;
