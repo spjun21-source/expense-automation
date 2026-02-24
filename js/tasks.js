@@ -231,16 +231,24 @@ class TaskManager {
         if (this.supabase) {
             try {
                 const { error } = await this.supabase.from('tasks').insert(task);
-                if (error) throw error;
+                if (error) {
+                    console.error('Cloud Insert Error:', error);
+                    window.app?.showToast(`⚠️ 서버 저장 실패: ${error.message}`, 'error');
+                }
             } catch (e) {
-                console.warn('⚠️ Cloud Sync failed, using local only:', e.message);
-                window.app?.showToast('⚠️ 클라우드 저장 실패 (오프라인 모드)', 'warning');
+                console.warn('⚠️ Cloud Sync failed:', e.message);
+                window.app?.showToast('⚠️ 클라우드 네트워크 연결 오류', 'warning');
             }
         }
 
         window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
         if (this.container) this.render(this.container);
         return task;
+    }
+
+    async forceRefresh() {
+        window.app?.showToast('🔄 서버 데이터를 동기화합니다...', 'info');
+        if (this.container) await this.render(this.container);
     }
 
     async cycleStatus(taskId, targetUserId) {
@@ -601,6 +609,8 @@ class TaskManager {
         editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
         memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
         editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
+        const btnRefresh = container.querySelector('#taskRefreshCloud');
+        btnRefresh?.addEventListener('click', () => this.forceRefresh());
     }
 }
 
