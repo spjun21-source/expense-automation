@@ -1,4 +1,7 @@
 // ============================================================
+
+import { WORKFLOW_STEPS } from './data.js';
+
 // 사업단 경비 처리 자동화 - Daily Tasks Module (v5.2)
 // 상태별 요약표, 일일 비망록(Comment), 실시간 저장 피드백 강화
 // ============================================================
@@ -88,16 +91,22 @@ class TaskManager {
         return allTasks;
     }
 
-    addTask(text) {
+    addTask(text, workflowId = '') {
         if (!text || !text.trim()) return null;
         const tasks = this._load(this.currentDate);
+        const now = new Date();
         const task = {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
             text: text.trim(),
             status: '대기',
             memo: '',
-            createdAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-            userId: this.userId
+            createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            createdAtFull: now.toLocaleString('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            }),
+            userId: this.userId,
+            workflowId: workflowId
         };
         tasks.push(task);
         this._save(tasks, this.currentDate);
@@ -241,9 +250,17 @@ class TaskManager {
         ${userChipsHtml}
 
         ${isToday && (!this.isAdmin || this.filterUserId === this.userId || this.filterUserId === '전체') ? `
-        <div class="tasks-input-row">
-          <input type="text" class="tasks-input" id="taskInput" placeholder="새로운 업무를 입력하세요..." maxlength="100">
-          <button class="btn btn-primary btn-sm" id="taskAddBtn">추가</button>
+        <div class="tasks-input-container">
+          <div class="tasks-workflow-selector-row">
+            <select class="task-workflow-select" id="taskWorkflowLink">
+              <option value="">🔗 관련 업무 절차 선택 (선택 사항)</option>
+              ${WORKFLOW_STEPS.map(s => `<option value="${s.id}">${s.groupTitle ? `[${s.groupTitle}] ` : ''}${s.title}</option>`).join('')}
+            </select>
+          </div>
+          <div class="tasks-input-row">
+            <input type="text" class="tasks-input" id="taskInput" placeholder="새로운 업무를 입력하세요..." maxlength="100">
+            <button class="btn btn-primary btn-sm" id="taskAddBtn">추가</button>
+          </div>
         </div>` : ''}
 
         <div class="tasks-list" id="tasksList">
@@ -304,18 +321,26 @@ class TaskManager {
         const isOwn = task.userId === this.userId;
         const canEdit = editable && (isOwn || this.isAdmin);
         const hasMemo = task.memo && task.memo.trim();
+        const workflow = task.workflowId ? WORKFLOW_STEPS.find(s => s.id === task.workflowId) : null;
 
         return `
       <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userId}">
         <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userId}" title="상태 변경">
           ${statusIcons[task.status]}
         </button>
-        <span class="task-author-badge ${isOwn ? 'own' : ''}">${task.userId}</span>
-        <span class="task-text ${task.status === '완료' ? 'completed' : ''}">${task.text}</span>
+        <div class="task-main-content">
+          <div class="task-meta-top">
+            <span class="task-author-badge ${isOwn ? 'own' : ''}">${task.userId}</span>
+            ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
+            <span class="task-full-time" title="생성 일시">${task.createdAtFull || task.createdAt}</span>
+          </div>
+          <div class="task-text-row">
+            <span class="task-text ${task.status === '완료' ? 'completed' : ''}">${task.text}</span>
+          </div>
+        </div>
         <button class="task-memo-btn ${hasMemo ? 'has-memo' : ''}" data-action="memo" data-id="${task.id}" data-owner="${task.userId}" title="${hasMemo ? task.memo : '비고 추가'}">
           ${hasMemo ? '💬' : '📝'}
         </button>
-        <span class="task-time">${task.createdAt}</span>
         ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userId}" title="삭제">🗑</button>` : ''}
       </div>
       ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${task.memo}</div>` : ''}`;
@@ -324,11 +349,12 @@ class TaskManager {
     _bindEvents(container) {
         // 업무 추가
         const input = container.querySelector('#taskInput');
+        const workflowSelect = container.querySelector('#taskWorkflowLink');
         const addBtn = container.querySelector('#taskAddBtn');
         if (input && addBtn) {
             const addTask = () => {
                 if (input.value.trim()) {
-                    this.addTask(input.value);
+                    this.addTask(input.value, workflowSelect?.value || '');
                     this.render(container);
                 }
             };
