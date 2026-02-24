@@ -18,10 +18,11 @@ class TaskManager {
     }
 
     _todayStr() {
-        const d = new Date();
-        const offset = d.getTimezoneOffset() * 60000;
-        const local = new Date(d.getTime() - offset);
-        return local.toISOString().split('T')[0];
+        // 모든 브라우저에서 동일한 한국 표준시(KST) 날짜를 사용하도록 강제
+        const now = new Date();
+        const kstOffset = 9 * 60; // KST is UTC+9
+        const kstDate = new Date(now.getTime() + (kstOffset * 60 * 1000));
+        return kstDate.toISOString().split('T')[0];
     }
 
     _storageKey(date) {
