@@ -17,7 +17,7 @@ class AuthManager {
         this.supabase = initSupabase();
         this._session = this._loadSession();
         this._cachedUsers = [];
-        this._initBootstrap();
+        this.bootstrapReady = this._initBootstrap(); // Track bootstrap
     }
 
     async _initBootstrap() {
@@ -182,8 +182,20 @@ class AuthManager {
     }
 
     async getUsers() {
-        const users = await this._getCloudUsers();
-        return users.map(({ password, ...rest }) => rest);
+        try {
+            const users = await this._getCloudUsers();
+            if (!users || users.length === 0) throw new Error('Empty user list');
+            return users.map(({ password, ...rest }) => rest);
+        } catch (e) {
+            console.warn('⚠️ [Auth] Using local fallback for user list:', e.message);
+            // 최소한 자기 자신은 포함된 리스트 반환
+            const local = this._getLocalUsers();
+            if (local.length > 0) return local.map(({ password, ...rest }) => rest);
+
+            // 진짜 아무것도 없으면 하드코딩된 기본값에서 현재 유저라도 반환
+            const current = this.getCurrentUser();
+            return current ? [current] : DEFAULT_USERS.map(({ password, ...rest }) => rest);
+        }
     }
 
     async updateUser(userId, data) {

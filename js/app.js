@@ -1,7 +1,7 @@
 // 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
 
-const APP_VERSION = 'v5.1.9';
+const APP_VERSION = 'v5.2.0';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -71,8 +71,11 @@ class App {
         if (loginOverlay) loginOverlay.style.display = 'none';
         if (mainApp) mainApp.style.display = 'block';
 
-        await this._initApp();
+        // 즉시 탭 구조 렌더링 (데이터는 비동기 로딩)
         this.switchTab(this.currentTab);
+
+        // 데이터 로딩 시작
+        await this._initApp();
     }
 
     _bindLoginEvents() {
@@ -119,18 +122,26 @@ class App {
             });
         }
 
-        // Cloud Data Loading (Non-blocking UI)
+        // Cloud Data Loading (Non-blocking UI with Timeout)
         try {
-            console.log('🔄 Loading Cloud Data...');
+            console.log('🔄 [App] Loading Data with v5.2.0 Safety...');
 
-            // Wait for store initialization
-            await Promise.race([
-                this.store.ready,
-                new Promise(resolve => setTimeout(resolve, 3000)) // 3s timeout
-            ]);
+            const withTimeout = (promise, ms, name) => {
+                return Promise.race([
+                    promise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} Timeout (${ms}ms)`)), ms))
+                ]);
+            };
 
-            // Init Task Manager
-            const users = await this.auth.getUsers();
+            // 1. Wait for bootstrap and store (max 3s)
+            await withTimeout(Promise.all([
+                this.auth.bootstrapReady,
+                this.store.ready
+            ]), 3000, 'Cloud Initialization');
+
+            // 2. Fetch Users (max 2s)
+            const users = await withTimeout(this.auth.getUsers(), 2000, 'User Fetch');
+
             this.taskMgr = new TaskManager(user.id, {
                 isAdmin: this.auth.isAdmin(),
                 allUserIds: users.map(u => u.id)
@@ -138,16 +149,23 @@ class App {
 
             const taskContainer = document.getElementById('tasksContainer');
             if (taskContainer) {
-                await this.taskMgr.render(taskContainer);
+                await withTimeout(this.taskMgr.render(taskContainer), 2000, 'Task Render');
             }
 
             // Load extra data
             await this.loadExpenseData();
-
-            console.log('✅ App Data Initialized');
+            console.log('✅ [App] All Data Loaded Successfully');
         } catch (err) {
-            console.error('❌ App Init Error:', err);
-            // Even if cloud fails, try to show something
+            console.error('⚠️ [App] Safety Fallback Triggered:', err.message);
+            // Fallback: Initialize with whatever we have
+            if (!this.taskMgr) {
+                this.taskMgr = new TaskManager(user.id, {
+                    isAdmin: this.auth.isAdmin(),
+                    allUserIds: [user.id]
+                });
+            }
+            const taskContainer = document.getElementById('tasksContainer');
+            if (taskContainer) await this.taskMgr.render(taskContainer);
             await this.loadExpenseData();
         }
 
