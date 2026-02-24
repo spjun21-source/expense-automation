@@ -1,10 +1,7 @@
 // ============================================================
 
 import { WORKFLOW_STEPS } from './data.js';
-
-// 사업단 경비 처리 자동화 - Daily Tasks Module (v5.2)
-// 상태별 요약표, 일일 비망록(Comment), 실시간 저장 피드백 강화
-// ============================================================
+import { initSupabase } from './supabase.js';
 
 class TaskManager {
     constructor(userId, options = {}) {
@@ -13,6 +10,11 @@ class TaskManager {
         this.isAdmin = options.isAdmin || false;
         this.allUserIds = options.allUserIds || [userId];
         this.filterUserId = '전체'; // 관리자 필터 (기본: 전체)
+
+        // Cloud Sync properties
+        this.supabase = initSupabase();
+        this.container = null;
+        this._setupRealtime();
     }
 
     _todayStr() {
@@ -27,23 +29,81 @@ class TaskManager {
         return `daily_comment_shared_${date || this.currentDate}`;
     }
 
-    _load(date) {
+    async _load(date) {
+        if (this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('date', date || this.currentDate)
+                    .order('createdAt', { ascending: true });
+                if (error) throw error;
+                return data || [];
+            } catch (e) {
+                console.error('Supabase Load Error:', e);
+            }
+        }
+
+        // Fallback to localStorage
         try {
             return JSON.parse(localStorage.getItem(this._storageKey(date)) || '[]');
         } catch { return []; }
     }
 
-    _save(tasks, date) {
+    async _save(tasks, date) {
+        // Local save (always)
         localStorage.setItem(this._storageKey(date), JSON.stringify(tasks));
+
+        // Cloud save (if connected)
+        if (this.supabase) {
+            // TaskManager mostly operates by replacing the whole set in local mode,
+            // but in cloud mode, individual updates are better. 
+            // For now, we sync the whole day's tasks to keep logic consistent.
+            // Note: In production, we'd upsert individually.
+            try {
+                // Warning: This overwrite logic is simple for demo/prototype.
+                // In full production, we'd use a more granular sync.
+                const { error } = await this.supabase
+                    .from('tasks')
+                    .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
+                if (error) console.error('Supabase Sync Error:', error);
+            } catch (e) { console.error(e); }
+        }
+
         this._showSavedIndicator();
     }
 
-    _saveComment(comment, date) {
+    async _saveComment(comment, date) {
         localStorage.setItem(this._commentKey(date), comment || '');
+
+        if (this.supabase) {
+            try {
+                await this.supabase
+                    .from('task_comments')
+                    .upsert({
+                        date: date || this.currentDate,
+                        content: comment || '',
+                        userId: this.userId,
+                        updatedAt: new Date().toISOString()
+                    }, { onConflict: 'date,userId' });
+            } catch (e) { console.error(e); }
+        }
+
         this._showSavedIndicator();
     }
 
-    _loadComment(date) {
+    async _loadComment(date) {
+        if (this.supabase) {
+            try {
+                const { data, error } = await this.supabase
+                    .from('task_comments')
+                    .select('*')
+                    .eq('date', date || this.currentDate)
+                    .order('updatedAt', { ascending: false })
+                    .limit(1);
+                if (!error && data && data.length > 0) return data[0].content;
+            } catch (e) { }
+        }
         return localStorage.getItem(this._commentKey(date)) || '';
     }
 
@@ -82,18 +142,33 @@ class TaskManager {
         return this.currentDate === this._todayStr();
     }
 
+    _setupRealtime() {
+        if (!this.supabase) return;
+
+        this.supabase
+            .channel('public:tasks')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+                console.log('🔄 Cloud Update Received:', payload);
+                if (this.container) this.render(this.container);
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
+                if (this.container) this.render(this.container);
+            })
+            .subscribe();
+    }
+
     // ---- 데이터 관리 ----
-    getTasks() {
-        const allTasks = this._load(this.currentDate);
+    async getTasks() {
+        const allTasks = await this._load(this.currentDate);
         if (this.isAdmin && this.filterUserId !== '전체') {
             return allTasks.filter(t => t.userId === this.filterUserId);
         }
         return allTasks;
     }
 
-    addTask(text, workflowId = '') {
+    async addTask(text, workflowId = '') {
         if (!text || !text.trim()) return null;
-        const tasks = this._load(this.currentDate);
+        const tasks = await this._load(this.currentDate);
         const now = new Date();
         const task = {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
@@ -106,16 +181,17 @@ class TaskManager {
                 hour: '2-digit', minute: '2-digit'
             }),
             userId: this.userId,
-            workflowId: workflowId
+            workflowId: workflowId,
+            date: this.currentDate
         };
         tasks.push(task);
-        this._save(tasks, this.currentDate);
+        await this._save(tasks, this.currentDate);
         window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
         return task;
     }
 
-    cycleStatus(taskId, targetUserId) {
-        const tasks = this._load(this.currentDate);
+    async cycleStatus(taskId, targetUserId) {
+        const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
 
@@ -127,12 +203,17 @@ class TaskManager {
 
         const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
         task.status = cycle[task.status] || '대기';
-        this._save(tasks, this.currentDate);
+
+        if (this.supabase) {
+            await this.supabase.from('tasks').update({ status: task.status }).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
         return task;
     }
 
-    updateMemo(taskId, memo, targetUserId) {
-        const tasks = this._load(this.currentDate);
+    async updateMemo(taskId, memo, targetUserId) {
+        const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
 
@@ -143,13 +224,17 @@ class TaskManager {
         }
 
         task.memo = memo;
-        this._save(tasks, this.currentDate);
+        if (this.supabase) {
+            await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
         window.app?.showToast('📝 비고가 저장되었습니다.', 'success');
         return task;
     }
 
-    deleteTask(taskId, targetUserId) {
-        const tasks = this._load(this.currentDate);
+    async deleteTask(taskId, targetUserId) {
+        const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -159,8 +244,12 @@ class TaskManager {
             return;
         }
 
-        const filtered = tasks.filter(t => t.id !== taskId);
-        this._save(filtered, this.currentDate);
+        if (this.supabase) {
+            await this.supabase.from('tasks').delete().eq('id', taskId);
+        } else {
+            const filtered = tasks.filter(t => t.id !== taskId);
+            await this._save(filtered, this.currentDate);
+        }
         window.app?.showToast('🗑 할일이 삭제되었습니다.', 'info');
     }
 
@@ -198,17 +287,18 @@ class TaskManager {
     // ============================================
     // 대시보드 렌더링
     // ============================================
-    render(container) {
+    async render(container) {
         if (!container) return;
+        this.container = container;
         const isToday = this.isToday();
         const dateDisplay = new Date(this.currentDate + 'T00:00:00').toLocaleDateString('ko-KR', {
             year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
         });
 
         // 데이터 로드
-        const tasks = this.getTasks();
+        const tasks = await this.getTasks();
         const mainStats = this.getStatsByData(tasks);
-        const dailyComment = this._loadComment(this.currentDate);
+        const dailyComment = await this._loadComment(this.currentDate);
 
         // 관리자용 사용자별 칩
         let userChipsHtml = '';
@@ -352,9 +442,9 @@ class TaskManager {
         const workflowSelect = container.querySelector('#taskWorkflowLink');
         const addBtn = container.querySelector('#taskAddBtn');
         if (input && addBtn) {
-            const addTask = () => {
+            const addTask = async () => {
                 if (input.value.trim()) {
-                    this.addTask(input.value, workflowSelect?.value || '');
+                    await this.addTask(input.value, workflowSelect?.value || '');
                     this.render(container);
                 }
             };
@@ -370,12 +460,10 @@ class TaskManager {
                 const owner = btn.dataset.owner || this.userId;
 
                 if (action === 'cycle') {
-                    this.cycleStatus(id, owner);
-                    this.render(container);
+                    this.cycleStatus(id, owner).then(() => this.render(container));
                 } else if (action === 'delete') {
                     if (confirm('이 업무를 삭제하시겠습니까?')) {
-                        this.deleteTask(id, owner);
-                        this.render(container);
+                        this.deleteTask(id, owner).then(() => this.render(container));
                     }
                 } else if (action === 'memo') {
                     e.stopPropagation();
@@ -452,8 +540,8 @@ class TaskManager {
         const memoInput = editor.querySelector('.task-memo-input');
         memoInput.focus();
 
-        const saveMemo = () => {
-            this.updateMemo(taskId, memoInput.value.trim(), ownerId);
+        const saveMemo = async () => {
+            await this.updateMemo(taskId, memoInput.value.trim(), ownerId);
             this.render(container);
         };
 
