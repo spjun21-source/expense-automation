@@ -11,12 +11,13 @@ const SUPABASE_CONFIG = {
     ANON_KEY: 'sb_publishable_9K7CY3Ov5PSrcmUiKGFpEA_IGAqnwun'
 };
 
-// Supabase 클라이언트 초기화 (CDN 로드 후 실행됨)
-let supabase = null;
+// Supabase 클라이언트 인스턴스
+let supabaseClient = null;
 
 function initSupabase() {
-    if (typeof supabase === 'undefined') {
-        console.error('Supabase SDK not loaded yet.');
+    // CDN에서 로드된 전역 supabase 객체 확인
+    if (typeof window.supabase === 'undefined') {
+        console.error('Supabase SDK not loaded yet. Check index.html script tag.');
         return null;
     }
 
@@ -27,14 +28,14 @@ function initSupabase() {
     }
 
     try {
-        // v2 SDK uses supabase.createClient
-        const client = supabase.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
+        // 전역 객체(window.supabase)로부터 클라이언트 생성
+        supabaseClient = window.supabase.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
         console.log('✅ Supabase Cloud Connected');
-        return client;
+        return supabaseClient;
     } catch (e) {
         console.error('Supabase Connection Error:', e);
         return null;
     }
 }
 
-export { initSupabase, supabase };
+export { initSupabase, supabaseClient as supabase };

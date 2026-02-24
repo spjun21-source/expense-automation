@@ -25,22 +25,32 @@ class App {
     }
 
     async init() {
-        // Bind UI events that don't depend on login first
+        // 1. 즉시 필요한 UI 이벤트 바인딩 (로그인 전후 무관)
         this._bindStaticEvents();
 
-        // Check existing session
+        // 2. 세션 체크 및 화면 전환
         if (this.auth.isLoggedIn()) {
             await this._showApp();
         } else {
             this._showLogin();
         }
+
+        // 3. 로그인 이벤트 바인딩
         this._bindLoginEvents();
     }
 
     _bindStaticEvents() {
-        // Tab navigation
+        // 탭 전환 이벤트 (즉시 바인딩)
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
+        });
+
+        // 로그아웃 (즉시 바인딩)
+        document.getElementById('logoutBtn')?.addEventListener('click', () => {
+            console.log('Logout clicked');
+            this.auth.logout();
+            this.editingDocId = null;
+            this._showLogin();
         });
     }
 
@@ -91,7 +101,7 @@ class App {
         const user = this.auth.getCurrentUser();
         if (!user) return;
 
-        // Header user info
+        // Header info
         const headerUser = document.getElementById('headerUser');
         const headerRole = document.getElementById('headerRole');
         if (headerUser) headerUser.textContent = `👤 ${user.name}`;
@@ -108,16 +118,37 @@ class App {
             });
         }
 
-        // Sync wait
-        await this.store.ready;
+        // Cloud Data Loading (Non-blocking UI)
+        try {
+            console.log('🔄 Loading Cloud Data...');
 
-        // Init task manager
-        const users = await this.auth.getUsers();
-        this.taskMgr = new TaskManager(user.id, {
-            isAdmin: this.auth.isAdmin(),
-            allUserIds: users.map(u => u.id)
-        });
-        await this.taskMgr.render(document.getElementById('tasksContainer'));
+            // Wait for store initialization
+            await Promise.race([
+                this.store.ready,
+                new Promise(resolve => setTimeout(resolve, 3000)) // 3s timeout
+            ]);
+
+            // Init Task Manager
+            const users = await this.auth.getUsers();
+            this.taskMgr = new TaskManager(user.id, {
+                isAdmin: this.auth.isAdmin(),
+                allUserIds: users.map(u => u.id)
+            });
+
+            const taskContainer = document.getElementById('tasksContainer');
+            if (taskContainer) {
+                await this.taskMgr.render(taskContainer);
+            }
+
+            // Load extra data
+            await this.loadExpenseData();
+
+            console.log('✅ App Data Initialized');
+        } catch (err) {
+            console.error('❌ App Init Error:', err);
+            // Even if cloud fails, try to show something
+            await this.loadExpenseData();
+        }
 
         // Admin UI visibility
         if (this.auth.isAdmin()) {
@@ -126,11 +157,6 @@ class App {
         } else {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
-
-        // Load 2025 expense data
-        await this.loadExpenseData();
-
-        // Resolution type selector
 
         // Resolution type selector
         document.querySelectorAll('.resolution-type-btn').forEach(btn => {
