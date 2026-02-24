@@ -184,15 +184,15 @@ class DocumentStore {
     }
 
     getByUser(userId) {
-        return this._docs.filter(d => d.authorId === userId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return this._docs.filter(d => d.authorId === userId).sort((a, b) => (b.updatedat || '').localeCompare(a.updatedat || ''));
     }
 
     getAll() {
-        return [...this._docs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return [...this._docs].sort((a, b) => (b.updatedat || '').localeCompare(a.updatedat || ''));
     }
 
     getPending() {
-        return this._docs.filter(d => d.status === '제출').sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+        return this._docs.filter(d => d.status === '제출').sort((a, b) => (a.updatedat || '').localeCompare(b.updatedat || ''));
     }
 
     getPendingCount() {
@@ -205,15 +205,15 @@ class DocumentStore {
             if (userId && d.authorId !== userId) return false;
             if (status && status !== '전체' && d.status !== status) return false;
             if (startDate) {
-                const docDate = d.createdAt.split('T')[0];
+                const docDate = (d.createdat || '').split('T')[0];
                 if (docDate < startDate) return false;
             }
             if (endDate) {
-                const docDate = d.createdAt.split('T')[0];
+                const docDate = (d.createdat || '').split('T')[0];
                 if (docDate > endDate) return false;
             }
             return true;
-        }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        }).sort((a, b) => (b.updatedat || '').localeCompare(a.updatedat || ''));
     }
 }
 

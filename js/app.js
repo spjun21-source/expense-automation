@@ -1,17 +1,17 @@
-const APP_VERSION = 'v5.2.20';
+const APP_VERSION = 'v5.2.21';
 
-// [v5.2.20 Diagnostic]
-console.log('📦 [app.js] Module loaded');
+// [v5.2.21 Diagnostic]
+console.log('📦 [app.js] Module load start...');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.20';
-import { TutorialEngine } from './tutorial.js?v=5.2.20';
-import { FormManager } from './forms.js?v=5.2.20';
-import { AuthManager } from './auth.js?v=5.2.20';
-import { DocumentStore } from './store.js?v=5.2.20';
-import { TaskManager } from './tasks.js?v=5.2.20';
-import { ApprovalManager } from './approval.js?v=5.2.20';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
+import { TutorialEngine } from './tutorial.js';
+import { FormManager } from './forms.js';
+import { AuthManager } from './auth.js';
+import { DocumentStore } from './store.js';
+import { TaskManager } from './tasks.js';
+import { ApprovalManager } from './approval.js';
 
-alert('🚀 시스템 작동 준비 완료 (v5.2.20)');
+alert('🚀 시스템 작동 준비 완료 (v5.2.21)');
 
 class App {
     constructor() {
