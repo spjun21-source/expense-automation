@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.2.18">
+  <link rel="stylesheet" href="css/style.css?v=5.2.19">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -34,7 +34,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.18</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.19</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -267,23 +267,28 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="js/supabase.js?v=5.2.18"></script>
-  <script type="module" src="js/app.js?v=5.2.18"></script>
+  <script type="module" src="js/supabase.js?v=5.2.19"></script>
+  <script type="module" src="js/app.js?v=5.2.19"></script>
   <script>
-    // [v5.2.18 Failsafe] 7초 이상 메인 화면이 안 뜨면 강제 로드 유도
+    // [v5.2.19 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
     setTimeout(() => {
       const mainApp = document.getElementById('mainApp');
       const loginOverlay = document.getElementById('loginOverlay');
-      if (mainApp && mainApp.style.display === 'none' && loginOverlay && (loginOverlay.style.display === 'none' || loginOverlay.style.display === '')) {
-        console.warn('⚠️ Dashboard load hang detected. Forcing display.');
+
+      // 실제 브라우저에 표시되는지 확인 (ComputedStyle 기준)
+      const isMainHidden = window.getComputedStyle(mainApp).display === 'none';
+      const isLoginHidden = window.getComputedStyle(loginOverlay).display === 'none';
+
+      if (isMainHidden && isLoginHidden) {
+        console.warn('⚠️ Critical load hang. UI is completely invisible.');
         const btn = document.createElement('div');
         btn.id = 'emergency-fix-btn';
         btn.style = 'position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-        btn.innerHTML = '⚙️ 시스템 강제 복구 (캐시 삭제)';
-        btn.onclick = () => { localStorage.clear(); location.reload(true); };
+        btn.innerHTML = '⚙️ 시스템 강제 복구 (데이터 초기화)';
+        btn.onclick = () => { if (confirm('시스템을 초기화합니다.')) { localStorage.clear(); location.reload(true); } };
         document.body.appendChild(btn);
       }
-    }, 7000);
+    }, 10000);
   </script>
 </body>
 

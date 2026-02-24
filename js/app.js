@@ -1,33 +1,41 @@
-const APP_VERSION = 'v5.2.18';
+const APP_VERSION = 'v5.2.19';
 
-console.log('📦 [Module Load] app.js started');
+// Diagnostic: 모듈 로드 확인
+console.log('📦 [app.js] Module loaded');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.18';
-import { TutorialEngine } from './tutorial.js?v=5.2.18';
-import { FormManager } from './forms.js?v=5.2.18';
-import { AuthManager } from './auth.js?v=5.2.18';
-import { DocumentStore } from './store.js?v=5.2.18';
-import { TaskManager } from './tasks.js?v=5.2.18';
-import { ApprovalManager } from './approval.js?v=5.2.18';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
+import { TutorialEngine } from './tutorial.js';
+import { FormManager } from './forms.js';
+import { AuthManager } from './auth.js';
+import { DocumentStore } from './store.js';
+import { TaskManager } from './tasks.js';
+import { ApprovalManager } from './approval.js';
 
 class App {
     constructor() {
         console.log('⚡ [App] Constructor started');
         try {
+            console.log('1. AuthManager init');
             this.auth = new AuthManager();
+            console.log('2. DocumentStore init');
             this.store = new DocumentStore();
+            console.log('3. TutorialEngine init');
             this.tutorial = new TutorialEngine();
+            console.log('4. FormManager init');
             this.formManager = new FormManager();
+            console.log('5. ApprovalManager init');
             this.approvalMgr = new ApprovalManager(this.store);
+
             this.taskMgr = null;
             this.currentTab = 'production';
             this.expenseData = [];
             this.editingDocId = null;
-            console.log('⚡ [App] Managers initialized. Calling init()...');
+
+            console.log('6. Calling init()');
             this.init();
         } catch (err) {
-            console.error('🛑 [App] Critical Constructor Error:', err);
-            alert(`🛑 시스템 초기화 및 매니저 로드 실패: ${err.message}`);
+            console.error('🛑 [App] Constructor Crash:', err);
+            alert(`🛑 초기화 실패 (Constructor): ${err.message}`);
         }
     }
 
@@ -743,14 +751,23 @@ class App {
     }
 }
 
-// Startup
-try {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('🎉 [DOM] Ready. Launching App...');
-        const app = new App();
-        window.app = app;
-    });
-} catch (startupErr) {
-    console.error('🛑 [Startup] Fatal error:', startupErr);
-    alert('🛑 어플리케이션 시작 실패: ' + startupErr.message);
+// Startup Logic
+const startApp = () => {
+    if (window.appStarted) return;
+    window.appStarted = true;
+    console.log('🎉 [System] Starting Application...');
+    try {
+        window.app = new App();
+    } catch (err) {
+        console.error('🛑 FATAL STARTUP:', err);
+        alert('🛑 시스템 시작 오류: ' + err.message);
+    }
+};
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    startApp();
+} else {
+    document.addEventListener('DOMContentLoaded', startApp);
 }
+// Failsafe for module execution context
+setTimeout(startApp, 1000);
