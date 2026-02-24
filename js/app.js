@@ -1,6 +1,7 @@
+// 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
-// 사업단 경비 처리 자동화 - Main Application (v5)
-// ============================================================
+
+const APP_VERSION = 'v5.1.0';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -104,10 +105,10 @@ class App {
         // Header info
         const headerUser = document.getElementById('headerUser');
         const headerRole = document.getElementById('headerRole');
-        if (headerUser) headerUser.textContent = `👤 ${user.name}`;
+        if (headerUser) headerUser.textContent = `👤 ${user.name} (${APP_VERSION})`;
         if (headerRole) {
             headerRole.textContent = user.role === 'admin' ? '관리자' : '사용자';
-            headerRole.className = `header-role ${user.role}`;
+            headerRole.className = `header-role ${user.role} glow`;
         }
 
         // Date
