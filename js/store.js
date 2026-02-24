@@ -10,6 +10,13 @@ class DocumentStore {
         this.ready = this._loadCloud(); // Capture the promise
     }
 
+    async _withTimeout(promise, ms = 2000, name = 'Store Query') {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} Timeout`)), ms))
+        ]);
+    }
+
     _setupRealtime() {
         if (!this.supabase) return;
         this.supabase
