@@ -31,17 +31,19 @@ class DocumentStore {
     async _loadCloud() {
         if (!this.supabase) return;
         try {
-            const { data, error } = await this.supabase
-                .from('documents')
-                .select('*')
-                .order('updatedAt', { ascending: false });
+            const { data, error } = await this._withTimeout(
+                this.supabase.from('documents')
+                    .select('*')
+                    .order('updatedAt', { ascending: false }),
+                2000, 'Store Load'
+            );
             if (!error && data) {
                 this._docs = data;
                 // Sync to local for offline/fallback
                 localStorage.setItem(DOC_STORAGE_KEY, JSON.stringify(this._docs));
             }
         } catch (e) {
-            console.error('Document Cloud Load Error:', e);
+            console.warn('⚠️ [Store] Cloud load failed, using local fallback:', e.message);
         }
     }
 

@@ -11,301 +11,291 @@ class TaskManager {
         this.allUserIds = options.allUserIds || [userId];
         this.filterUserId = '전체'; // 관리자 필터 (기본: 전체)
 
-        // Cloud Sync properties
-        this.supabase = initSupabase();
-        this.container = null;
-        this._setupRealtime();
-    }
-
-    _todayStr() {
-        return new Date().toISOString().split('T')[0];
-    }
-
-    _storageKey(date) {
-        return `daily_tasks_shared_${date || this.currentDate}`;
-    }
-
-    _commentKey(date) {
-        return `daily_comment_shared_${date || this.currentDate}`;
-    }
+    async _withTimeout(promise, ms = 1500, name = 'Task Query') {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} Timeout`)), ms))
+            ]);
+        }
 
     async _load(date) {
-        if (this.supabase) {
+            if (this.supabase) {
+                try {
+                    const { data, error } = await this._withTimeout(
+                        this.supabase.from('tasks').select('*')
+                            .eq('date', date || this.currentDate)
+                            .order('createdAt', { ascending: true }),
+                        1500, 'Tasks Load'
+                    );
+                    if (error) throw error;
+                    return data || [];
+                } catch (e) {
+                    console.warn('⚠️ [Tasks] Cloud Load failed, using local fallback:', e.message);
+                }
+            }
+
+            // Fallback to localStorage
             try {
-                const { data, error } = await this.supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('date', date || this.currentDate)
-                    .order('createdAt', { ascending: true });
-                if (error) throw error;
-                return data || [];
-            } catch (e) {
-                console.error('Supabase Load Error:', e);
+                return JSON.parse(localStorage.getItem(this._storageKey(date)) || '[]');
+            } catch { return []; }
+        }
+
+    async _save(tasks, date) {
+            // Local save (always)
+            localStorage.setItem(this._storageKey(date), JSON.stringify(tasks));
+
+            // Cloud save (if connected)
+            if (this.supabase) {
+                // TaskManager mostly operates by replacing the whole set in local mode,
+                // but in cloud mode, individual updates are better. 
+                // For now, we sync the whole day's tasks to keep logic consistent.
+                // Note: In production, we'd upsert individually.
+                try {
+                    // Warning: This overwrite logic is simple for demo/prototype.
+                    // In full production, we'd use a more granular sync.
+                    const { error } = await this.supabase
+                        .from('tasks')
+                        .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
+                    if (error) console.error('Supabase Sync Error:', error);
+                } catch (e) { console.error(e); }
+            }
+
+            this._showSavedIndicator();
+        }
+
+    async _saveComment(comment, date) {
+            localStorage.setItem(this._commentKey(date), comment || '');
+
+            if (this.supabase) {
+                try {
+                    await this.supabase
+                        .from('task_comments')
+                        .upsert({
+                            date: date || this.currentDate,
+                            content: comment || '',
+                            userId: this.userId,
+                            updatedAt: new Date().toISOString()
+                        }, { onConflict: 'date,userId' });
+                } catch (e) { console.error(e); }
+            }
+
+            this._showSavedIndicator();
+        }
+
+    async _loadComment(date) {
+            if (this.supabase) {
+                try {
+                    const { data, error } = await this.supabase
+                        .from('task_comments')
+                        .select('*')
+                        .eq('date', date || this.currentDate)
+                        .order('updatedAt', { ascending: false })
+                        .limit(1);
+                    if (!error && data && data.length > 0) return data[0].content;
+                } catch (e) { }
+            }
+            return localStorage.getItem(this._commentKey(date)) || '';
+        }
+
+        _showSavedIndicator() {
+            const indicator = document.getElementById('taskSaveIndicator');
+            if (indicator) {
+                indicator.classList.remove('visible');
+                void indicator.offsetWidth; // trigger reflow
+                indicator.classList.add('visible');
+                setTimeout(() => indicator.classList.remove('visible'), 1500);
             }
         }
 
-        // Fallback to localStorage
-        try {
-            return JSON.parse(localStorage.getItem(this._storageKey(date)) || '[]');
-        } catch { return []; }
-    }
+        setUser(userId) { this.userId = userId; }
 
-    async _save(tasks, date) {
-        // Local save (always)
-        localStorage.setItem(this._storageKey(date), JSON.stringify(tasks));
+        setDate(dateStr) { this.currentDate = dateStr; }
 
-        // Cloud save (if connected)
-        if (this.supabase) {
-            // TaskManager mostly operates by replacing the whole set in local mode,
-            // but in cloud mode, individual updates are better. 
-            // For now, we sync the whole day's tasks to keep logic consistent.
-            // Note: In production, we'd upsert individually.
-            try {
-                // Warning: This overwrite logic is simple for demo/prototype.
-                // In full production, we'd use a more granular sync.
-                const { error } = await this.supabase
-                    .from('tasks')
-                    .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
-                if (error) console.error('Supabase Sync Error:', error);
-            } catch (e) { console.error(e); }
+        prevDate() {
+            const d = new Date(this.currentDate);
+            d.setDate(d.getDate() - 1);
+            this.currentDate = d.toISOString().split('T')[0];
+            return this.currentDate;
         }
 
-        this._showSavedIndicator();
-    }
-
-    async _saveComment(comment, date) {
-        localStorage.setItem(this._commentKey(date), comment || '');
-
-        if (this.supabase) {
-            try {
-                await this.supabase
-                    .from('task_comments')
-                    .upsert({
-                        date: date || this.currentDate,
-                        content: comment || '',
-                        userId: this.userId,
-                        updatedAt: new Date().toISOString()
-                    }, { onConflict: 'date,userId' });
-            } catch (e) { console.error(e); }
+        nextDate() {
+            const d = new Date(this.currentDate);
+            d.setDate(d.getDate() + 1);
+            const today = this._todayStr();
+            const next = d.toISOString().split('T')[0];
+            if (next > today) return this.currentDate;
+            this.currentDate = next;
+            return this.currentDate;
         }
 
-        this._showSavedIndicator();
-    }
-
-    async _loadComment(date) {
-        if (this.supabase) {
-            try {
-                const { data, error } = await this.supabase
-                    .from('task_comments')
-                    .select('*')
-                    .eq('date', date || this.currentDate)
-                    .order('updatedAt', { ascending: false })
-                    .limit(1);
-                if (!error && data && data.length > 0) return data[0].content;
-            } catch (e) { }
+        isToday() {
+            return this.currentDate === this._todayStr();
         }
-        return localStorage.getItem(this._commentKey(date)) || '';
-    }
 
-    _showSavedIndicator() {
-        const indicator = document.getElementById('taskSaveIndicator');
-        if (indicator) {
-            indicator.classList.remove('visible');
-            void indicator.offsetWidth; // trigger reflow
-            indicator.classList.add('visible');
-            setTimeout(() => indicator.classList.remove('visible'), 1500);
+        _setupRealtime() {
+            if (!this.supabase) return;
+
+            this.supabase
+                .channel('public:tasks')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+                    console.log('🔄 Cloud Update Received:', payload);
+                    if (this.container) this.render(this.container);
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
+                    if (this.container) this.render(this.container);
+                })
+                .subscribe();
         }
-    }
-
-    setUser(userId) { this.userId = userId; }
-
-    setDate(dateStr) { this.currentDate = dateStr; }
-
-    prevDate() {
-        const d = new Date(this.currentDate);
-        d.setDate(d.getDate() - 1);
-        this.currentDate = d.toISOString().split('T')[0];
-        return this.currentDate;
-    }
-
-    nextDate() {
-        const d = new Date(this.currentDate);
-        d.setDate(d.getDate() + 1);
-        const today = this._todayStr();
-        const next = d.toISOString().split('T')[0];
-        if (next > today) return this.currentDate;
-        this.currentDate = next;
-        return this.currentDate;
-    }
-
-    isToday() {
-        return this.currentDate === this._todayStr();
-    }
-
-    _setupRealtime() {
-        if (!this.supabase) return;
-
-        this.supabase
-            .channel('public:tasks')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
-                console.log('🔄 Cloud Update Received:', payload);
-                if (this.container) this.render(this.container);
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
-                if (this.container) this.render(this.container);
-            })
-            .subscribe();
-    }
 
     // ---- 데이터 관리 ----
     async getTasks() {
-        const allTasks = await this._load(this.currentDate);
-        if (this.isAdmin && this.filterUserId !== '전체') {
-            return allTasks.filter(t => t.userId === this.filterUserId);
+            const allTasks = await this._load(this.currentDate);
+            if (this.isAdmin && this.filterUserId !== '전체') {
+                return allTasks.filter(t => t.userId === this.filterUserId);
+            }
+            return allTasks;
         }
-        return allTasks;
-    }
 
     async addTask(text, workflowId = '') {
-        if (!text || !text.trim()) return null;
-        const tasks = await this._load(this.currentDate);
-        const now = new Date();
-        const task = {
-            id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
-            text: text.trim(),
-            status: '대기',
-            memo: '',
-            createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-            createdAtFull: now.toLocaleString('ko-KR', {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit'
-            }),
-            userId: this.userId,
-            workflowId: workflowId,
-            date: this.currentDate
-        };
-        tasks.push(task);
-        await this._save(tasks, this.currentDate);
-        window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
-        return task;
-    }
+            if (!text || !text.trim()) return null;
+            const tasks = await this._load(this.currentDate);
+            const now = new Date();
+            const task = {
+                id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+                text: text.trim(),
+                status: '대기',
+                memo: '',
+                createdAt: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                createdAtFull: now.toLocaleString('ko-KR', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                }),
+                userId: this.userId,
+                workflowId: workflowId,
+                date: this.currentDate
+            };
+            tasks.push(task);
+            await this._save(tasks, this.currentDate);
+            window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
+            return task;
+        }
 
     async cycleStatus(taskId, targetUserId) {
-        const tasks = await this._load(this.currentDate);
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return null;
+            const tasks = await this._load(this.currentDate);
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return null;
 
-        // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
-            return null;
+            // Permission check: Owner or Admin
+            if (task.userId !== this.userId && !this.isAdmin) {
+                window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
+                return null;
+            }
+
+            const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
+            task.status = cycle[task.status] || '대기';
+
+            if (this.supabase) {
+                await this.supabase.from('tasks').update({ status: task.status }).eq('id', taskId);
+            } else {
+                await this._save(tasks, this.currentDate);
+            }
+            return task;
         }
-
-        const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
-        task.status = cycle[task.status] || '대기';
-
-        if (this.supabase) {
-            await this.supabase.from('tasks').update({ status: task.status }).eq('id', taskId);
-        } else {
-            await this._save(tasks, this.currentDate);
-        }
-        return task;
-    }
 
     async updateMemo(taskId, memo, targetUserId) {
-        const tasks = await this._load(this.currentDate);
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return null;
+            const tasks = await this._load(this.currentDate);
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return null;
 
-        // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
-            return null;
-        }
+            // Permission check: Owner or Admin
+            if (task.userId !== this.userId && !this.isAdmin) {
+                window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
+                return null;
+            }
 
-        task.memo = memo;
-        if (this.supabase) {
-            await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
-        } else {
-            await this._save(tasks, this.currentDate);
+            task.memo = memo;
+            if (this.supabase) {
+                await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
+            } else {
+                await this._save(tasks, this.currentDate);
+            }
+            window.app?.showToast('📝 비고가 저장되었습니다.', 'success');
+            return task;
         }
-        window.app?.showToast('📝 비고가 저장되었습니다.', 'success');
-        return task;
-    }
 
     async deleteTask(taskId, targetUserId) {
-        const tasks = await this._load(this.currentDate);
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
+            const tasks = await this._load(this.currentDate);
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
 
-        // Permission check: Owner or Admin
-        if (task.userId !== this.userId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
-            return;
+            // Permission check: Owner or Admin
+            if (task.userId !== this.userId && !this.isAdmin) {
+                window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
+                return;
+            }
+
+            if (this.supabase) {
+                await this.supabase.from('tasks').delete().eq('id', taskId);
+            } else {
+                const filtered = tasks.filter(t => t.id !== taskId);
+                await this._save(filtered, this.currentDate);
+            }
+            window.app?.showToast('🗑 할일이 삭제되었습니다.', 'info');
         }
 
-        if (this.supabase) {
-            await this.supabase.from('tasks').delete().eq('id', taskId);
-        } else {
-            const filtered = tasks.filter(t => t.id !== taskId);
-            await this._save(filtered, this.currentDate);
+        // ---- 통계 및 요약 ----
+        getStatsByData(tasks) {
+            const total = tasks.length;
+            const waiting = tasks.filter(t => t.status === '대기').length;
+            const inProgress = tasks.filter(t => t.status === '진행').length;
+            const done = tasks.filter(t => t.status === '완료').length;
+            const calcPct = (count) => total === 0 ? 0 : Math.round((count / total) * 100);
+
+            return {
+                total,
+                waiting, waitingPct: calcPct(waiting),
+                inProgress, inProgressPct: calcPct(inProgress),
+                done, donePct: calcPct(done)
+            };
         }
-        window.app?.showToast('🗑 할일이 삭제되었습니다.', 'info');
-    }
 
-    // ---- 통계 및 요약 ----
-    getStatsByData(tasks) {
-        const total = tasks.length;
-        const waiting = tasks.filter(t => t.status === '대기').length;
-        const inProgress = tasks.filter(t => t.status === '진행').length;
-        const done = tasks.filter(t => t.status === '완료').length;
-        const calcPct = (count) => total === 0 ? 0 : Math.round((count / total) * 100);
+        getAllUsersTasks() {
+            return this.getTasks();
+        }
 
-        return {
-            total,
-            waiting, waitingPct: calcPct(waiting),
-            inProgress, inProgressPct: calcPct(inProgress),
-            done, donePct: calcPct(done)
-        };
-    }
+        getStatsByUser() {
+            const result = {};
+            const allTasks = this._load(this.currentDate);
 
-    getAllUsersTasks() {
-        return this.getTasks();
-    }
-
-    getStatsByUser() {
-        const result = {};
-        const allTasks = this._load(this.currentDate);
-
-        this.allUserIds.forEach(uid => {
-            const userTasks = allTasks.filter(t => t.userId === uid);
-            result[uid] = this.getStatsByData(userTasks);
-        });
-        return result;
-    }
+            this.allUserIds.forEach(uid => {
+                const userTasks = allTasks.filter(t => t.userId === uid);
+                result[uid] = this.getStatsByData(userTasks);
+            });
+            return result;
+        }
 
     // ============================================
     // 대시보드 렌더링
     // ============================================
     async render(container) {
-        if (!container) return;
-        this.container = container;
-        const isToday = this.isToday();
-        const dateDisplay = new Date(this.currentDate + 'T00:00:00').toLocaleDateString('ko-KR', {
-            year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
-        });
+            if (!container) return;
+            this.container = container;
+            const isToday = this.isToday();
+            const dateDisplay = new Date(this.currentDate + 'T00:00:00').toLocaleDateString('ko-KR', {
+                year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+            });
 
-        // 데이터 로드
-        const tasks = await this.getTasks();
-        const mainStats = this.getStatsByData(tasks);
-        const dailyComment = await this._loadComment(this.currentDate);
+            // 데이터 로드
+            const tasks = await this.getTasks();
+            const mainStats = this.getStatsByData(tasks);
+            const dailyComment = await this._loadComment(this.currentDate);
 
-        // 관리자용 사용자별 칩
-        let userChipsHtml = '';
-        if (this.isAdmin) {
-            const byUser = this.getStatsByUser();
-            const entries = Object.entries(byUser).filter(([, s]) => s.total > 0 || this.filterUserId === '전체');
-            userChipsHtml = `<div class="task-user-summary">
+            // 관리자용 사용자별 칩
+            let userChipsHtml = '';
+            if (this.isAdmin) {
+                const byUser = this.getStatsByUser();
+                const entries = Object.entries(byUser).filter(([, s]) => s.total > 0 || this.filterUserId === '전체');
+                userChipsHtml = `<div class="task-user-summary">
                 ${entries.map(([uid, s]) => `
                     <div class="task-user-stat ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">
                         <span class="task-user-id">${uid}</span>
@@ -315,10 +305,10 @@ class TaskManager {
                     </div>
                 `).join('')}
             </div>`;
-        }
+            }
 
-        // 헤더 렌더링 (저장 인디케이터 포함)
-        container.innerHTML = `
+            // 헤더 렌더링 (저장 인디케이터 포함)
+            container.innerHTML = `
       <div class="tasks-widget">
         <div class="tasks-header">
           <div class="tasks-title-row">
@@ -355,7 +345,7 @@ class TaskManager {
 
         <div class="tasks-list" id="tasksList">
           ${tasks.length === 0 ? '<div class="tasks-empty">등록된 업무가 없습니다</div>' :
-                tasks.map(t => this._renderTask(t, isToday)).join('')}
+                    tasks.map(t => this._renderTask(t, isToday)).join('')}
         </div>
 
         <!-- 하단 업무 요약표 -->
@@ -402,18 +392,18 @@ class TaskManager {
         </div>
       </div>
     `;
-        this._bindEvents(container);
-    }
+            this._bindEvents(container);
+        }
 
-    _renderTask(task, editable) {
-        const statusIcons = { '대기': '⬜', '진행': '🔄', '완료': '✅' };
-        const statusClass = { '대기': 'waiting', '진행': 'progress', '완료': 'done' };
-        const isOwn = task.userId === this.userId;
-        const canEdit = editable && (isOwn || this.isAdmin);
-        const hasMemo = task.memo && task.memo.trim();
-        const workflow = task.workflowId ? WORKFLOW_STEPS.find(s => s.id === task.workflowId) : null;
+        _renderTask(task, editable) {
+            const statusIcons = { '대기': '⬜', '진행': '🔄', '완료': '✅' };
+            const statusClass = { '대기': 'waiting', '진행': 'progress', '완료': 'done' };
+            const isOwn = task.userId === this.userId;
+            const canEdit = editable && (isOwn || this.isAdmin);
+            const hasMemo = task.memo && task.memo.trim();
+            const workflow = task.workflowId ? WORKFLOW_STEPS.find(s => s.id === task.workflowId) : null;
 
-        return `
+            return `
       <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userId}">
         <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userId}" title="상태 변경">
           ${statusIcons[task.status]}
@@ -434,98 +424,98 @@ class TaskManager {
         ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userId}" title="삭제">🗑</button>` : ''}
       </div>
       ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${task.memo}</div>` : ''}`;
-    }
-
-    _bindEvents(container) {
-        // 업무 추가
-        const input = container.querySelector('#taskInput');
-        const workflowSelect = container.querySelector('#taskWorkflowLink');
-        const addBtn = container.querySelector('#taskAddBtn');
-        if (input && addBtn) {
-            const addTask = async () => {
-                if (input.value.trim()) {
-                    await this.addTask(input.value, workflowSelect?.value || '');
-                    this.render(container);
-                }
-            };
-            addBtn.addEventListener('click', addTask);
-            input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
         }
 
-        // 상태 변경, 삭제, 개별 메모
-        container.querySelectorAll('[data-action]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = btn.dataset.action;
-                const id = btn.dataset.id;
-                const owner = btn.dataset.owner || this.userId;
-
-                if (action === 'cycle') {
-                    this.cycleStatus(id, owner).then(() => this.render(container));
-                } else if (action === 'delete') {
-                    if (confirm('이 업무를 삭제하시겠습니까?')) {
-                        this.deleteTask(id, owner).then(() => this.render(container));
+        _bindEvents(container) {
+            // 업무 추가
+            const input = container.querySelector('#taskInput');
+            const workflowSelect = container.querySelector('#taskWorkflowLink');
+            const addBtn = container.querySelector('#taskAddBtn');
+            if (input && addBtn) {
+                const addTask = async () => {
+                    if (input.value.trim()) {
+                        await this.addTask(input.value, workflowSelect?.value || '');
+                        this.render(container);
                     }
-                } else if (action === 'memo') {
-                    e.stopPropagation();
-                    this._showMemoEditor(container, id, owner);
-                }
+                };
+                addBtn.addEventListener('click', addTask);
+                input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+            }
+
+            // 상태 변경, 삭제, 개별 메모
+            container.querySelectorAll('[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = btn.dataset.action;
+                    const id = btn.dataset.id;
+                    const owner = btn.dataset.owner || this.userId;
+
+                    if (action === 'cycle') {
+                        this.cycleStatus(id, owner).then(() => this.render(container));
+                    } else if (action === 'delete') {
+                        if (confirm('이 업무를 삭제하시겠습니까?')) {
+                            this.deleteTask(id, owner).then(() => this.render(container));
+                        }
+                    } else if (action === 'memo') {
+                        e.stopPropagation();
+                        this._showMemoEditor(container, id, owner);
+                    }
+                });
             });
-        });
 
-        // 비망록 (Comment) 저장
-        const commentInput = container.querySelector('#dailyCommentInput');
-        const saveCommentBtn = container.querySelector('#btnSaveComment');
-        if (commentInput) {
-            const saveComment = () => {
-                const val = commentInput.value;
-                this._saveComment(val, this.currentDate);
-            };
-            commentInput.addEventListener('blur', saveComment);
-            saveCommentBtn?.addEventListener('click', () => {
-                saveComment();
-                window.app?.showToast('📝 비망록이 저장되었습니다.', 'success');
-            });
-        }
+            // 비망록 (Comment) 저장
+            const commentInput = container.querySelector('#dailyCommentInput');
+            const saveCommentBtn = container.querySelector('#btnSaveComment');
+            if (commentInput) {
+                const saveComment = () => {
+                    const val = commentInput.value;
+                    this._saveComment(val, this.currentDate);
+                };
+                commentInput.addEventListener('blur', saveComment);
+                saveCommentBtn?.addEventListener('click', () => {
+                    saveComment();
+                    window.app?.showToast('📝 비망록이 저장되었습니다.', 'success');
+                });
+            }
 
-        // 관리자 필터
-        container.querySelector('#taskUserFilter')?.addEventListener('change', (e) => {
-            this.filterUserId = e.target.value;
-            this.render(container);
-        });
-
-        // 사용자 칩 클릭 필터
-        container.querySelectorAll('[data-filter-uid]').forEach(el => {
-            el.addEventListener('click', () => {
-                this.filterUserId = el.dataset.filterUid;
+            // 관리자 필터
+            container.querySelector('#taskUserFilter')?.addEventListener('change', (e) => {
+                this.filterUserId = e.target.value;
                 this.render(container);
             });
-        });
 
-        // 날짜 탐색
-        container.querySelector('#taskPrevDate')?.addEventListener('click', () => {
-            this.prevDate();
-            this.render(container);
-        });
-        container.querySelector('#taskNextDate')?.addEventListener('click', () => {
-            this.nextDate();
-            this.render(container);
-        });
-    }
+            // 사용자 칩 클릭 필터
+            container.querySelectorAll('[data-filter-uid]').forEach(el => {
+                el.addEventListener('click', () => {
+                    this.filterUserId = el.dataset.filterUid;
+                    this.render(container);
+                });
+            });
 
-    _showMemoEditor(container, taskId, ownerId) {
-        const tasks = this._load(this.currentDate);
-        const task = tasks.find(t => t.id === taskId);
-        const currentMemo = task?.memo || '';
+            // 날짜 탐색
+            container.querySelector('#taskPrevDate')?.addEventListener('click', () => {
+                this.prevDate();
+                this.render(container);
+            });
+            container.querySelector('#taskNextDate')?.addEventListener('click', () => {
+                this.nextDate();
+                this.render(container);
+            });
+        }
 
-        const existingEditor = container.querySelector('.task-memo-editor');
-        if (existingEditor) existingEditor.remove();
+        _showMemoEditor(container, taskId, ownerId) {
+            const tasks = this._load(this.currentDate);
+            const task = tasks.find(t => t.id === taskId);
+            const currentMemo = task?.memo || '';
 
-        const taskItem = container.querySelector(`[data-id="${taskId}"].task-item`);
-        if (!taskItem) return;
+            const existingEditor = container.querySelector('.task-memo-editor');
+            if (existingEditor) existingEditor.remove();
 
-        const editor = document.createElement('div');
-        editor.className = 'task-memo-editor';
-        editor.innerHTML = `
+            const taskItem = container.querySelector(`[data-id="${taskId}"].task-item`);
+            if (!taskItem) return;
+
+            const editor = document.createElement('div');
+            editor.className = 'task-memo-editor';
+            editor.innerHTML = `
       <input type="text" class="task-memo-input" value="${currentMemo}" placeholder="비고 내용을 입력하세요..." maxlength="200">
       <div class="editor-actions">
         <button class="btn btn-xs btn-primary task-memo-save">저장</button>
@@ -533,22 +523,22 @@ class TaskManager {
       </div>
     `;
 
-        const memoDisplay = container.querySelector(`[data-memo-for="${taskId}"]`);
-        const insertAfter = memoDisplay || taskItem;
-        insertAfter.parentNode.insertBefore(editor, insertAfter.nextSibling);
+            const memoDisplay = container.querySelector(`[data-memo-for="${taskId}"]`);
+            const insertAfter = memoDisplay || taskItem;
+            insertAfter.parentNode.insertBefore(editor, insertAfter.nextSibling);
 
-        const memoInput = editor.querySelector('.task-memo-input');
-        memoInput.focus();
+            const memoInput = editor.querySelector('.task-memo-input');
+            memoInput.focus();
 
-        const saveMemo = async () => {
-            await this.updateMemo(taskId, memoInput.value.trim(), ownerId);
-            this.render(container);
-        };
+            const saveMemo = async () => {
+                await this.updateMemo(taskId, memoInput.value.trim(), ownerId);
+                this.render(container);
+            };
 
-        editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
-        memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
-        editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
+            editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
+            memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
+            editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
+        }
     }
-}
 
 export { TaskManager };

@@ -1,7 +1,7 @@
 // 사업단 경비 처리 자동화 - Main Application (v5.1 - Cloud Fixed)
 // ============================================================
 
-const APP_VERSION = 'v5.2.0';
+const APP_VERSION = 'v5.2.1';
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -183,16 +183,23 @@ class App {
             if (cloudIndicator) {
                 if (this.auth.supabase) {
                     try {
-                        const { error } = await this.auth.supabase.from('users').select('id').limit(1);
+                        const withTimeout = (promise, ms) => Promise.race([
+                            promise, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))
+                        ]);
+
+                        const { error } = await withTimeout(
+                            this.auth.supabase.from('users').select('id').limit(1),
+                            1000
+                        );
                         if (error) throw error;
                         cloudIndicator.className = 'cloud-indicator online';
                         cloudIndicator.querySelector('.status-text').textContent = 'Cloud Connected';
                     } catch (e) {
                         cloudIndicator.className = 'cloud-indicator offline';
-                        let msg = 'Cloud Error (Key check failed)';
+                        let msg = 'Cloud Offline';
                         const curKey = this.auth.supabase.supabaseKey || '';
                         if (curKey.startsWith('sb_publishable')) {
-                            msg = 'Cloud Error (Stripe Key Detected)';
+                            msg = 'Cloud Error (Stripe Key)';
                         }
                         cloudIndicator.querySelector('.status-text').textContent = msg;
                     }
