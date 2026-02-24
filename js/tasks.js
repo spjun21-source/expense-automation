@@ -16,32 +16,32 @@ class TaskManager {
         return new Date().toISOString().split('T')[0];
     }
 
-    _storageKey(userId, date) {
-        return `daily_tasks_${userId || this.userId}_${date || this.currentDate}`;
+    _storageKey(date) {
+        return `daily_tasks_shared_${date || this.currentDate}`;
     }
 
-    _commentKey(userId, date) {
-        return `daily_comment_${userId || this.userId}_${date || this.currentDate}`;
+    _commentKey(date) {
+        return `daily_comment_shared_${date || this.currentDate}`;
     }
 
-    _load(userId, date) {
+    _load(date) {
         try {
-            return JSON.parse(localStorage.getItem(this._storageKey(userId, date)) || '[]');
+            return JSON.parse(localStorage.getItem(this._storageKey(date)) || '[]');
         } catch { return []; }
     }
 
-    _save(tasks, userId, date) {
-        localStorage.setItem(this._storageKey(userId, date), JSON.stringify(tasks));
+    _save(tasks, date) {
+        localStorage.setItem(this._storageKey(date), JSON.stringify(tasks));
         this._showSavedIndicator();
     }
 
-    _saveComment(comment, userId, date) {
-        localStorage.setItem(this._commentKey(userId, date), comment || '');
+    _saveComment(comment, date) {
+        localStorage.setItem(this._commentKey(date), comment || '');
         this._showSavedIndicator();
     }
 
-    _loadComment(userId, date) {
-        return localStorage.getItem(this._commentKey(userId, date)) || '';
+    _loadComment(date) {
+        return localStorage.getItem(this._commentKey(date)) || '';
     }
 
     _showSavedIndicator() {
@@ -81,12 +81,16 @@ class TaskManager {
 
     // ---- 데이터 관리 ----
     getTasks() {
-        return this._load(this.userId, this.currentDate);
+        const allTasks = this._load(this.currentDate);
+        if (this.isAdmin && this.filterUserId !== '전체') {
+            return allTasks.filter(t => t.userId === this.filterUserId);
+        }
+        return allTasks;
     }
 
     addTask(text) {
         if (!text || !text.trim()) return null;
-        const tasks = this._load(this.userId);
+        const tasks = this._load(this.currentDate);
         const task = {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
             text: text.trim(),
@@ -96,37 +100,58 @@ class TaskManager {
             userId: this.userId
         };
         tasks.push(task);
-        this._save(tasks, this.userId);
+        this._save(tasks, this.currentDate);
         window.app?.showToast('📌 할일이 추가되었습니다.', 'success');
         return task;
     }
 
     cycleStatus(taskId, targetUserId) {
-        const uid = targetUserId || this.userId;
-        const tasks = this._load(uid);
+        const tasks = this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
+
+        // Permission check: Owner or Admin
+        if (task.userId !== this.userId && !this.isAdmin) {
+            window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
+            return null;
+        }
+
         const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
         task.status = cycle[task.status] || '대기';
-        this._save(tasks, uid);
+        this._save(tasks, this.currentDate);
         return task;
     }
 
     updateMemo(taskId, memo, targetUserId) {
-        const uid = targetUserId || this.userId;
-        const tasks = this._load(uid);
+        const tasks = this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
+
+        // Permission check: Owner or Admin
+        if (task.userId !== this.userId && !this.isAdmin) {
+            window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
+            return null;
+        }
+
         task.memo = memo;
-        this._save(tasks, uid);
+        this._save(tasks, this.currentDate);
         window.app?.showToast('📝 비고가 저장되었습니다.', 'success');
         return task;
     }
 
     deleteTask(taskId, targetUserId) {
-        const uid = targetUserId || this.userId;
-        const tasks = this._load(uid).filter(t => t.id !== taskId);
-        this._save(tasks, uid);
+        const tasks = this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Permission check: Owner or Admin
+        if (task.userId !== this.userId && !this.isAdmin) {
+            window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
+            return;
+        }
+
+        const filtered = tasks.filter(t => t.id !== taskId);
+        this._save(filtered, this.currentDate);
         window.app?.showToast('🗑 할일이 삭제되었습니다.', 'info');
     }
 
@@ -147,21 +172,16 @@ class TaskManager {
     }
 
     getAllUsersTasks() {
-        let allTasks = [];
-        const targetIds = this.filterUserId === '전체' ? this.allUserIds : [this.filterUserId];
-        targetIds.forEach(uid => {
-            const tasks = this._load(uid, this.currentDate);
-            tasks.forEach(t => { t.userId = t.userId || uid; });
-            allTasks = allTasks.concat(tasks);
-        });
-        return allTasks;
+        return this.getTasks();
     }
 
     getStatsByUser() {
         const result = {};
+        const allTasks = this._load(this.currentDate);
+
         this.allUserIds.forEach(uid => {
-            const tasks = this._load(uid, this.currentDate);
-            result[uid] = this.getStatsByData(tasks);
+            const userTasks = allTasks.filter(t => t.userId === uid);
+            result[uid] = this.getStatsByData(userTasks);
         });
         return result;
     }
@@ -177,9 +197,9 @@ class TaskManager {
         });
 
         // 데이터 로드
-        const tasks = this.isAdmin ? this.getAllUsersTasks() : this.getTasks();
+        const tasks = this.getTasks();
         const mainStats = this.getStatsByData(tasks);
-        const dailyComment = this._loadComment(this.userId, this.currentDate);
+        const dailyComment = this._loadComment(this.currentDate);
 
         // 관리자용 사용자별 칩
         let userChipsHtml = '';
@@ -344,7 +364,7 @@ class TaskManager {
         if (commentInput) {
             const saveComment = () => {
                 const val = commentInput.value;
-                this._saveComment(val, this.userId, this.currentDate);
+                this._saveComment(val, this.currentDate);
             };
             commentInput.addEventListener('blur', saveComment);
             saveCommentBtn?.addEventListener('click', () => {
@@ -379,8 +399,7 @@ class TaskManager {
     }
 
     _showMemoEditor(container, taskId, ownerId) {
-        const uid = ownerId || this.userId;
-        const tasks = this._load(uid);
+        const tasks = this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         const currentMemo = task?.memo || '';
 
@@ -408,7 +427,7 @@ class TaskManager {
         memoInput.focus();
 
         const saveMemo = () => {
-            this.updateMemo(taskId, memoInput.value.trim(), uid);
+            this.updateMemo(taskId, memoInput.value.trim(), ownerId);
             this.render(container);
         };
 
