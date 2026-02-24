@@ -133,9 +133,9 @@ class ApprovalManager {
   }
 
   // ---- 사용자 관리 렌더링 ----
-  renderUserManagement(container, auth) {
+  async renderUserManagement(container, auth) {
     if (!container) return;
-    const users = auth.getUsers();
+    const users = await auth.getUsers();
     container.innerHTML = `
       <div class="usermgmt-section">
         <h3>👥 사용자 관리</h3>
@@ -167,7 +167,7 @@ class ApprovalManager {
         </div>
       </div>`;
 
-    container.querySelector('#addUserBtn')?.addEventListener('click', () => {
+    container.querySelector('#addUserBtn')?.addEventListener('click', async () => {
       const id = document.getElementById('newUserId')?.value;
       const pw = document.getElementById('newUserPw')?.value;
       const name = document.getElementById('newUserName')?.value;
@@ -177,7 +177,7 @@ class ApprovalManager {
         window.app?.showToast('아이디, 비밀번호, 이름은 필수입니다.', 'error');
         return;
       }
-      const result = auth.register(id, pw, name, dept || '', role);
+      const result = await auth.register(id, pw, name, dept || '', role);
       if (result.success) {
         window.app?.showToast(`✅ '${name}' 사용자가 등록되었습니다.`, 'success');
         this.renderUserManagement(container, auth);
@@ -187,10 +187,10 @@ class ApprovalManager {
     });
 
     container.querySelectorAll('[data-action="deluser"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const uid = btn.dataset.uid;
         if (confirm(`'${uid}' 사용자를 삭제하시겠습니까?`)) {
-          const result = auth.deleteUser(uid);
+          const result = await auth.deleteUser(uid);
           if (result.success) {
             window.app?.showToast('삭제되었습니다.', 'success');
             this.renderUserManagement(container, auth);
@@ -200,9 +200,10 @@ class ApprovalManager {
     });
 
     container.querySelectorAll('[data-action="edituser"]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const uid = btn.dataset.uid;
-        const user = auth.getUsers().find(u => u.id === uid);
+        const users = await auth.getUsers();
+        const user = users.find(u => u.id === uid);
         if (user) this.showEditUserModal(user, auth, () => this.renderUserManagement(container, auth));
       });
     });
@@ -257,7 +258,7 @@ class ApprovalManager {
 
     modal.querySelector('.modal-close').onclick = close;
     modal.querySelector('.btn-modal-close').onclick = close;
-    modal.querySelector('#saveUserBtn').onclick = () => {
+    modal.querySelector('#saveUserBtn').onclick = async () => {
       const password = modal.querySelector('#editUserPw').value || undefined;
       const name = modal.querySelector('#editUserName').value;
       const dept = modal.querySelector('#editUserDept').value;
@@ -268,7 +269,7 @@ class ApprovalManager {
         return;
       }
 
-      const result = auth.updateUser(user.id, { password, name, dept, role });
+      const result = await auth.updateUser(user.id, { password, name, dept, role });
       if (result.success) {
         window.app?.showToast('✅ 정보가 수정되었습니다.', 'success');
         onUpdate();

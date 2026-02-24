@@ -6,8 +6,8 @@ class DocumentStore {
     constructor() {
         this.supabase = initSupabase();
         this._docs = this._loadLocal();
-        this._loadCloud(); // Async cloud load
         this._setupRealtime();
+        this.ready = this._loadCloud(); // Capture the promise
     }
 
     _setupRealtime() {

@@ -54,8 +54,8 @@ class App {
         const loginPw = document.getElementById('loginPw');
         const loginError = document.getElementById('loginError');
 
-        const doLogin = () => {
-            const result = this.auth.login(loginId.value, loginPw.value);
+        const doLogin = async () => {
+            const result = await this.auth.login(loginId.value, loginPw.value);
             if (result.success) {
                 loginError.textContent = '';
                 loginId.value = '';
@@ -92,12 +92,16 @@ class App {
             });
         }
 
+        // Sync wait
+        await this.store.ready;
+
         // Init task manager
+        const users = await this.auth.getUsers();
         this.taskMgr = new TaskManager(user.id, {
             isAdmin: this.auth.isAdmin(),
-            allUserIds: this.auth.getUsers().map(u => u.id)
+            allUserIds: users.map(u => u.id)
         });
-        this.taskMgr.render(document.getElementById('tasksContainer'));
+        await this.taskMgr.render(document.getElementById('tasksContainer'));
 
         // Admin UI visibility
         if (this.auth.isAdmin()) {
@@ -166,7 +170,7 @@ class App {
         if (this.auth.isAdmin()) {
             this.approvalMgr.renderPendingList(document.getElementById('approvalContainer'));
             this.approvalMgr.renderHistory(document.getElementById('approvalHistoryContainer'));
-            this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
+            await this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
         }
         this.updateStats();
 
