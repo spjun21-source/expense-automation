@@ -3124,3 +3124,17 @@ body {
   justify-content: flex-end;
   gap: 12px;
 }
+/* Sync Status Badge */
+.sync-status-badge {
+    font-size: 1rem;
+    margin: 0 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.sync-status-badge.online { color: #4ade80; }
+.sync-status-badge.offline { color: #f87171; opacity: 0.5; }
+
