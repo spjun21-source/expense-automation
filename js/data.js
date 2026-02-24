@@ -1305,6 +1305,9 @@ const OVERALL_OVERVIEW = {
             <div class="compliance-alert">
                 <p>⚠️ <strong>국가연구개발혁신법</strong>에 따라 모든 집행은 연구 목적에 부합해야 하며, 증빙 서류는 5년간 보관 의무가 있습니다.</p>
             </div>
+            <div style="margin-top:20px; text-align:center;">
+                <a href="https://bio-core-tutorial.vercel.app/" target="_blank" class="btn btn-outline">🔗 상세 업무 매뉴얼 (외부 링크)</a>
+            </div>
         </div>
     `
 };
