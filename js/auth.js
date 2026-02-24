@@ -101,8 +101,8 @@ class AuthManager {
 
                 if (error) {
                     console.error('❌ [Auth] Supabase Login Error:', error);
-                    // 특정 오류가 아닌 'Failed to fetch' 등의 네트워크 오류인 경우 로컬 폴백 유도
-                    if (error.message === 'Failed to fetch' || error.status === 0) {
+                    // 'TypeError: Failed to fetch' 등 모든 fetch 관련 오류 포함
+                    if (error.message && error.message.toLowerCase().includes('fetch')) {
                         throw new Error('Network failure');
                     }
                     systemError = `시스템 오류: ${error.message}`;
@@ -110,15 +110,20 @@ class AuthManager {
                     user = data;
                 }
             } catch (err) {
-                console.error('❌ [Auth] Fatal Login Exception (Falling back):', err);
-                // 네트워크 오류 발생 시 로컬로 전환하여 로그인 시도
-                const users = this._getLocalUsers();
-                user = users.find(u => u.id === userId && u.password === password);
-                if (!user) systemError = '네트워크 연결 실패 및 로컬 계정 정보 없음';
+                console.error('❌ [Auth] Fatal Login Exception (Absolute Fallback):', err);
+                // 1. LocalStorage 확인
+                const localUsers = this._getLocalUsers();
+                user = localUsers.find(u => u.id === userId && u.password === password);
+
+                // 2. LocalStorage에도 없으면 DEFAULT_USERS (하드코딩된 기본값) 확인
+                if (!user) {
+                    user = DEFAULT_USERS.find(u => u.id === userId && u.password === password);
+                }
+
+                if (!user) systemError = '네트워크 연결 실패 및 유효한 계정 정보 정합성 오류';
             }
         } else {
-            console.warn('⚠️ [Auth] Supabase not connected. Falling back to LocalStorage.');
-            const users = this._getLocalUsers();
+            const users = this._getLocalUsers().length > 0 ? this._getLocalUsers() : DEFAULT_USERS;
             user = users.find(u => u.id === userId && u.password === password);
         }
 
