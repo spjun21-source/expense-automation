@@ -1264,4 +1264,50 @@ const DOCUMENT_TYPES = [
     }
 ];
 
-export { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS };
+// 업무 전체 개요 설명 데이터
+const OVERALL_OVERVIEW = {
+    title: '🏥 사업단 경비 처리 업무 전체 개요',
+    description: 'ER 바이오코어 사업단의 경비 처리는 국가연구개발혁신법을 준수하며, 크게 수입, 지출, 대체 업무로 나뉩니다.',
+    content: `
+        <div class="overview-section">
+            <h3 class="overview-subtitle">1. 업무 흐름 요약</h3>
+            <div class="overview-steps">
+                <div class="overview-step">
+                    <div class="step-icon">💰</div>
+                    <h4>수입 업무</h4>
+                    <p>사업비 및 대응자금 입금 확인 후 시스템 등록 및 결의서 작성</p>
+                </div>
+                <div class="overview-step">
+                    <div class="step-icon">💸</div>
+                    <h4>지출 업무</h4>
+                    <p>예산 확인, 증빙 수집, 시스템 청구, 전자결재, 이체 및 결의서 제출</p>
+                </div>
+                <div class="overview-step">
+                    <div class="step-icon">🔄</div>
+                    <h4>대체 업무</h4>
+                    <p>인건비, 간접비, 이자 등 재원 간 이동 및 정산 처리</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overview-section">
+            <h3 class="overview-subtitle">2. 주요 핵심 도구 (Tool Stack)</h3>
+            <ul class="tool-list">
+                <li><strong>e-Branch (IBK)</strong>: 실시간 입출금 확인 및 이체 실행</li>
+                <li><strong>연구비 종합관리시스템</strong>: 연구비 청구, 수입/징수 결의 및 전자결재</li>
+                <li><strong>베스트케어 (병원시스템)</strong>: 공식 지출/수입/대체 결의서 작성 및 재무팀 제출</li>
+                <li><strong>통합 이지바로 (Ezbaro)</strong>: 국고 연구비 실시간 통합 관리 및 정산 연계</li>
+            </ul>
+        </div>
+
+        <div class="overview-section">
+            <h3 class="overview-subtitle">3. 준수 사항 (Compliance)</h3>
+            <div class="compliance-alert">
+                <p>⚠️ <strong>국가연구개발혁신법</strong>에 따라 모든 집행은 연구 목적에 부합해야 하며, 증빙 서류는 5년간 보관 의무가 있습니다.</p>
+            </div>
+        </div>
+    `
+};
+
+export { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS, OVERALL_OVERVIEW };
+

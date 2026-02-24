@@ -2,14 +2,76 @@
 // 사업단 경비 처리 자동화 - Tutorial Engine (v2)
 // ============================================================
 
-import { WORKFLOW_STEPS, SCENARIOS } from './data.js';
+import { WORKFLOW_STEPS, SCENARIOS, OVERALL_OVERVIEW } from './data.js';
 
 class TutorialEngine {
   constructor() {
     this.progress = { completedSteps: [], quizResults: {}, completedScenarios: [] };
     this.currentScenario = null;
     this.currentStep = 0;
+    this.container = null;
+    this.searchTerm = '';
     this.loadProgress();
+  }
+
+  init(container) {
+    this.container = container;
+    this.renderWorkflow(this.container);
+    this._bindEvents();
+    this.bindQuizEvents(this.container);
+  }
+
+  _bindEvents() {
+    // Search functionality
+    const searchInput = document.getElementById('tutorialSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.searchTerm = e.target.value.toLowerCase();
+        this.renderWorkflow(this.container);
+      });
+    }
+
+    // Overall Overview button
+    const overviewBtn = document.getElementById('btnOverallOverview');
+    if (overviewBtn) {
+      overviewBtn.addEventListener('click', () => {
+        this.showOverallOverview();
+      });
+    }
+  }
+
+  showOverallOverview() {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+      <div class="modal-content modal-lg">
+        <div class="modal-header">
+          <h2 class="modal-title">${OVERALL_OVERVIEW.title}</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body tutorial-overview-body">
+          <p class="overview-desc">${OVERALL_OVERVIEW.description}</p>
+          <div class="overview-content-rich">
+            ${OVERALL_OVERVIEW.content}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary btn-modal-close">확인</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeBtn = modal.querySelector('.modal-close');
+    const footerCloseBtn = modal.querySelector('.btn-modal-close');
+    const closeModal = () => {
+      modal.classList.remove('active');
+      setTimeout(() => modal.remove(), 300);
+    };
+
+    closeBtn.onclick = closeModal;
+    footerCloseBtn.onclick = closeModal;
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
   }
 
   loadProgress() {
@@ -29,7 +91,39 @@ class TutorialEngine {
     container.innerHTML = '';
     let currentGroup = '';
 
-    WORKFLOW_STEPS.forEach((step, idx) => {
+    const filteredSteps = WORKFLOW_STEPS.filter(step => {
+      if (!this.searchTerm) return true;
+      return (
+        step.title.toLowerCase().includes(this.searchTerm) ||
+        step.description.toLowerCase().includes(this.searchTerm) ||
+        (step.system && step.system.toLowerCase().includes(this.searchTerm)) ||
+        (step.details && step.details.some(d => d.toLowerCase().includes(this.searchTerm)))
+      );
+    });
+
+    if (filteredSteps.length === 0) {
+      container.innerHTML = `
+        <div class="search-empty">
+          <div class="empty-icon">🔍</div>
+          <p class="empty-text">'${this.searchTerm}'에 대한 검색 결과가 없습니다.</p>
+          <button class="btn btn-sm btn-outline" id="btnResetSearch">초기화</button>
+        </div>
+      `;
+      const resetBtn = container.querySelector('#btnResetSearch');
+      if (resetBtn) {
+        resetBtn.onclick = () => {
+          const searchInput = document.getElementById('tutorialSearchInput');
+          if (searchInput) {
+            searchInput.value = '';
+            this.searchTerm = '';
+            this.renderWorkflow(container);
+          }
+        };
+      }
+      return;
+    }
+
+    filteredSteps.forEach((step, idx) => {
       // Group header
       if (step.groupTitle && step.group !== currentGroup) {
         currentGroup = step.group;

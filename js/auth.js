@@ -5,7 +5,8 @@
 const DEFAULT_USERS = [
     { id: 'admin', password: 'admin1234', name: '관리자', dept: '사업단', role: 'admin' },
     { id: 'user01', password: 'user1234', name: '사용자1', dept: '연구팀', role: 'user' },
-    { id: 'user02', password: 'user2345', name: '사용자2', dept: '재무팀', role: 'user' }
+    { id: 'user02', password: 'user2345', name: '사용자2', dept: '재무팀', role: 'user' },
+    { id: 'user03', password: 'user3456', name: '사용자3', dept: '임상팀', role: 'user' }
 ];
 
 const STORAGE_KEYS = {
@@ -94,6 +95,22 @@ class AuthManager {
 
     getUsers() {
         return this._getUsers().map(({ password, ...rest }) => rest);
+    }
+
+    updateUser(userId, data) {
+        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+        const users = this._getUsers();
+        const index = users.findIndex(u => u.id === userId);
+        if (index === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
+
+        // Update fields if provided
+        if (data.name) users[index].name = data.name;
+        if (data.dept) users[index].dept = data.dept;
+        if (data.role) users[index].role = data.role;
+        if (data.password) users[index].password = data.password;
+
+        this._saveUsers(users);
+        return { success: true };
     }
 
     getUserCount() {

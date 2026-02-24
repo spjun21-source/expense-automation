@@ -105,8 +105,15 @@
       <!-- 학습 모드 -->
       <section class="tab-panel active" id="panelTutorial">
         <div class="section-header">
-          <h2 class="section-title">📖 경비 처리 업무 절차 (인수인계서 기준)</h2>
-          <p class="section-subtitle">각 단계를 클릭하여 상세 내용과 퀴즈를 확인하세요. 인수인계서 양식과 1:1 매칭되었습니다.</p>
+          <div class="section-title-wrap">
+            <h2 class="section-title">📖 경비 처리 업무 절차 (인수인계서 기준)</h2>
+            <button class="btn btn-outline btn-sm" id="btnOverallOverview">🏥 업무 전체 개요</button>
+          </div>
+          <p class="section-subtitle">각 단계를 클릭하여 상세 내용과 퀴즈를 확인하세요.</p>
+          <div class="tutorial-search-wrap">
+            <input type="text" id="tutorialSearchInput" class="form-input"
+              placeholder="💡 업무 단계, 비목, 시스템명 검색 (예: 재료비, 결의서, 이지바로)">
+          </div>
         </div>
         <div id="workflowContainer" class="workflow-container"></div>
       </section>
