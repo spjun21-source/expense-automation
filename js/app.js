@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.29.3';
+const APP_VERSION = 'v5.2.29.4';
 
-console.log('📦 [app.js] Module load start (v5.2.29.3)');
+console.log('📦 [app.js] Module load start (v5.2.29.4)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -15,7 +15,7 @@ import { ApprovalManager } from './approval.js';
 class App {
     constructor() {
         console.log('⚡ [App] Constructor started');
-        this._updateDiagnostic('Core 엔진 로딩 중...');
+        if (window.setDiag) window.setDiag('App 엔진 시동 중...');
 
         try {
             this.auth = new AuthManager();
@@ -30,16 +30,16 @@ class App {
             this.editingDocId = null;
 
             this.init();
+            window.app = this; // Global exposure
         } catch (err) {
             console.error('🛑 [App] Constructor Crash:', err);
-            this._updateDiagnostic(`초기화 오류: ${err.message}`);
+            if (window.setDiag) window.setDiag(`초기화 오류: ${err.message}`, true);
             alert(`🛑 초기화 실패 (Constructor): ${err.message}`);
         }
     }
 
     _updateDiagnostic(msg) {
-        const el = document.getElementById('systemDiagnostic');
-        if (el) el.textContent = msg;
+        if (window.setDiag) window.setDiag(msg);
         console.log(`[Diagnostic] ${msg}`);
     }
 
@@ -832,10 +832,12 @@ const startApp = () => {
     if (window.appStarted) return;
     window.appStarted = true;
     console.log('🎉 [System] Starting Application...');
+    if (window.setDiag) window.setDiag('시스템 시동 중...');
     try {
         window.app = new App();
     } catch (err) {
         console.error('🛑 FATAL STARTUP:', err);
+        if (window.setDiag) window.setDiag(`시동 실패: ${err.message}`, true);
         alert('🛑 시스템 시작 오류: ' + err.message);
     }
 };
