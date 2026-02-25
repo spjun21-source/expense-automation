@@ -9,6 +9,7 @@ class TaskManager {
         this.currentDate = this._todayStr();
         this.isAdmin = options.isAdmin || false;
         this.allUserIds = options.allUserIds || [userid];
+        this.userMap = options.userMap || {};
         this.filterUserId = '전체';
 
         this.supabase = initSupabase();
@@ -136,7 +137,7 @@ class TaskManager {
         if (this.container) this.render(this.container);
     }
 
-        async _loadComments(date) {
+    async _loadComments(date) {
         if (this.supabase) {
             try {
                 const { data, error } = await this._withTimeout(
@@ -418,9 +419,9 @@ class TaskManager {
         // 상단 사용자 필터 칩 구성 (v5.2.29)
         const userChipsHtml = this.isAdmin ? `
             <div class="user-filter-chips">
-                <div class="user-chip ${!this.filterUserId ? 'active' : ''}" data-filter-uid="">전체보기</div>
+                <div class="user-chip ${!this.filterUserId || this.filterUserId === '전체' ? 'active' : ''}" data-filter-uid="전체">전체보기</div>
                 ${this.allUserIds.map(uid => `
-                    <div class="user-chip ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">${uid}</div>
+                    <div class="user-chip ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">${this.userMap[uid] || uid}</div>
                 `).join('')}
             </div>
         ` : '';
@@ -436,7 +437,7 @@ class TaskManager {
                     <div class="comment-body">
                         <div class="comment-text">${c.content}</div>
                         <div class="comment-meta">
-                            👤 ${c.userId} | ${new Date(c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                            👤 ${this.userMap[c.userId] || c.userId} | ${new Date(c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     </div>
                     <div class="comment-actions">
@@ -534,7 +535,7 @@ class TaskManager {
         </button>
         <div class="task-main-content">
           <div class="task-meta-top">
-            <span class="task-author-badge ${isOwn ? 'own' : ''}">${task.userid}</span>
+            <span class="task-author-badge ${isOwn ? 'own' : ''}">${this.userMap[task.userid] || task.userid}</span>
             ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
             <span class="task-full-time" title="생성 일시">${task.createdatfull || task.createdat}</span>
           </div>
