@@ -410,9 +410,6 @@ class TaskManager {
         // 데이터 로드
         const tasks = await this.getTasks();
         const mainStats = this.getStatsByData(tasks);
-        // 데이터 로드
-        const tasks = await this.getTasks();
-        const mainStats = this.getStatsByData(tasks);
         const dailyComments = await this._loadComments(this.currentDate);
 
         // ... (userChipsHtml logic remains)
