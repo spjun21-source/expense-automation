@@ -1,10 +1,10 @@
 import { initSupabase } from './supabase.js';
 
 const DEFAULT_USERS = [
-    { id: 'admin', password: 'admin1234', name: '관리자', dept: '사업단', role: 'admin' },
-    { id: 'user01', password: 'user1234', name: '사용자1', dept: '연구팀', role: 'user' },
-    { id: 'user02', password: 'user2345', name: '사용자2', dept: '재무팀', role: 'user' },
-    { id: 'user03', password: 'user3456', name: '사용자3', dept: '임상팀', role: 'user' }
+    { id: 'admin', password: 'admin1234', name: '최고 관리자', dept: '경영팀', role: 'admin' },
+    { id: 'user01', password: 'user011234', name: '유수진', dept: '사업단', role: 'user' },
+    { id: 'user02', password: 'user021234', name: '이은지', dept: '사업단', role: 'user' },
+    { id: 'user03', password: 'user031234', name: '박선영', dept: '사업단', role: 'user' }
 ];
 
 const STORAGE_KEYS = {
@@ -205,6 +205,29 @@ class AuthManager {
         }
     }
 
+    async addUser(userObj) {
+        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+
+        if (this.supabase) {
+            const { error } = await this.supabase
+                .from('users')
+                .insert({
+                    ...userObj,
+                    updatedat: new Date().toISOString()
+                });
+            if (error) {
+                if (error.code === '23505') return { success: false, error: '이미 존재하는 아이디입니다.' };
+                return { success: false, error: '등록 중 오류가 발생했습니다: ' + error.message };
+            }
+        }
+
+        const users = this._getLocalUsers();
+        if (users.some(u => u.id === userObj.id)) return { success: false, error: '이미 존재하는 아이디입니다.' };
+        users.push(userObj);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        return { success: true };
+    }
+
     async updateUser(userId, data) {
         if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
 
@@ -216,17 +239,28 @@ class AuthManager {
                     updatedat: new Date().toISOString()
                 })
                 .eq('id', userId);
-            if (error) return { success: false, error: '수정 중 오류가 발생했습니다.' };
-        } else {
-            const users = this._getLocalUsers();
-            const index = users.findIndex(u => u.id === userId);
-            if (index === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
-            if (data.name) users[index].name = data.name;
-            if (data.dept) users[index].dept = data.dept;
-            if (data.role) users[index].role = data.role;
-            if (data.password) users[index].password = data.password;
-            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+            if (error) return { success: false, error: '수정 중 오류가 발생했습니다: ' + error.message };
         }
+
+        const users = this._getLocalUsers();
+        const index = users.findIndex(u => u.id === userId);
+        if (index === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
+        users[index] = { ...users[index], ...data };
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        return { success: true };
+    }
+
+    async deleteUser(userId) {
+        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+        if (userId === 'admin') return { success: false, error: '관리자 계정은 삭제할 수 없습니다.' };
+
+        if (this.supabase) {
+            const { error } = await this.supabase.from('users').delete().eq('id', userId);
+            if (error) return { success: false, error: '삭제 중 오류가 발생했습니다.' };
+        }
+
+        const filtered = this._getLocalUsers().filter(u => u.id !== userId);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(filtered));
         return { success: true };
     }
 

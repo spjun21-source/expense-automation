@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.28';
+const APP_VERSION = 'v5.2.29';
 
-console.log('📦 [app.js] Module load start (v5.2.28)');
+console.log('📦 [app.js] Module load start (v5.2.29)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -222,12 +222,17 @@ class App {
             await this.loadExpenseData();
         }
 
-        // Admin UI visibility
-        if (this.auth.isAdmin()) {
+        // Admin UI visibility (v5.2.29 Sidebar)
+        const isAdmin = this.auth.isAdmin();
+        if (isAdmin) {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+            const adminNav = document.getElementById('adminNav');
+            if (adminNav) adminNav.style.display = 'block';
             this.updatePendingBadge();
         } else {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            const adminNav = document.getElementById('adminNav');
+            if (adminNav) adminNav.style.display = 'none';
         }
 
         // Update Cloud Indicator (v5.1.7 Real Validation)
@@ -346,25 +351,42 @@ class App {
 
     switchTab(tabId) {
         this.currentTab = tabId;
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+
+        // Sidebar active state
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+
         const panelMap = {
             tutorial: 'panelTutorial',
             practice: 'panelPractice',
             production: 'panelProduction',
             mydocs: 'panelMyDocs',
             admin: 'panelAdmin',
-            reference: 'panelReference'
+            reference: 'panelReference',
+            'user-mgmt': 'panelAdmin' // Map User Management to Admin panel
         };
+
         document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
         const activePanel = document.getElementById(panelMap[tabId]);
         if (activePanel) activePanel.classList.add('active');
 
-        // Refresh lists on tab switch
+        // Header Title Update
+        const pageTitleNode = document.getElementById('pageTitle');
+        if (pageTitleNode) {
+            const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
+            if (activeBtn) pageTitleNode.textContent = activeBtn.textContent.replace(/[^\w\s가-힣]/g, '').trim();
+        }
+
+        // Tab Content Load
         if (tabId === 'mydocs') this.renderMyDocs();
-        else if (tabId === 'admin' && this.auth.isAdmin()) {
+        else if ((tabId === 'admin' || tabId === 'user-mgmt') && this.auth.isAdmin()) {
             this.approvalMgr.renderPendingList(document.getElementById('approvalContainer'));
             this.approvalMgr.renderHistory(document.getElementById('approvalHistoryContainer'));
             this.approvalMgr.renderUserManagement(document.getElementById('userMgmtContainer'), this.auth);
+
+            // Auto-scroll to User Management if that was clicked
+            if (tabId === 'user-mgmt') {
+                document.getElementById('userMgmtContainer')?.scrollIntoView({ behavior: 'smooth' });
+            }
         }
     }
 

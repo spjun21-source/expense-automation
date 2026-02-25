@@ -42,7 +42,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.28</span>
+        <h2>사업단 업무 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.29</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -66,237 +66,256 @@
     </div>
   </div>
 
-  <!-- Main App (hidden until login) -->
-  <div id="mainApp" style="display:none;">
+  <!-- v5.2.29: Main Portal Layout -->
+  <div id="mainApp" style="display:none;" class="portal-wrapper">
 
-    <!-- Header -->
-    <header class="app-header">
-      <div class="header-content">
-        <div class="header-left">
-          <h1 class="app-title">🏥 사업단 경비 처리 자동화</h1>
-          <p class="app-subtitle">ER 바이오코어 사업단 업무 튜토리얼 & 증빙 관리</p>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">💼 PORTAL</div>
+        <div class="sidebar-version">v5.2.29</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">업무 현황</div>
+        <button class="nav-btn active" data-tab="production">⚡ 실전 모드</button>
+        <button class="nav-btn" data-tab="mydocs">📋 문서 관리</button>
+
+        <div class="nav-section">학습 & 연습</div>
+        <button class="nav-btn" data-tab="tutorial">📖 학습 모드</button>
+        <button class="nav-btn" data-tab="practice">🎯 연습 모드</button>
+
+        <div class="nav-section">보조 도구</div>
+        <button class="nav-btn" data-tab="reference">📚 증빙 가이드</button>
+
+        <!-- Admin Section -->
+        <div id="adminNav" style="display:none;">
+          <div class="nav-section">시스템 관리</div>
+          <button class="nav-btn" data-tab="admin">🔐 결재함</button>
+          <button class="nav-btn" data-tab="user-mgmt">👥 사용자 관리</button>
         </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-chip">
+          <span id="headerUser"></span>
+          <small id="headerRole"></small>
+        </div>
+        <button class="btn btn-sm btn-outline btn-block" id="logoutBtn">로그아웃</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <header class="content-header">
+        <h1 id="pageTitle">실전 모드</h1>
         <div class="header-right">
           <div id="cloudIndicator" class="cloud-indicator offline">
             <span class="dot"></span> <span class="status-text">Cloud Offline</span>
           </div>
-          <div class="user-info">
-            <span class="header-user" id="headerUser"></span>
-            <span class="header-role" id="headerRole"></span>
-          </div>
           <span class="header-date" id="currentDate"></span>
-          <button class="btn btn-sm btn-outline" id="logoutBtn">로그아웃</button>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <!-- Dashboard Stats + Daily Tasks -->
-    <div class="dashboard-area">
-      <div class="dashboard">
-        <div class="stat-card">
-          <div class="stat-icon">📖</div>
-          <div class="stat-value" id="statSteps">0/7</div>
-          <div class="stat-label">학습 완료</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">📝</div>
-          <div class="stat-value" id="statQuiz">0%</div>
-          <div class="stat-label">퀴즈 정답률</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">🎯</div>
-          <div class="stat-value" id="statScenarios">0/4</div>
-          <div class="stat-label">시나리오 완료</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">📄</div>
-          <div class="stat-value" id="statDocs">0</div>
-          <div class="stat-label">생성 문서</div>
-        </div>
-      </div>
-      <div class="tasks-container" id="tasksContainer"></div>
-    </div>
-
-    <!-- Tab Navigation -->
-    <nav class="tab-nav">
-      <button class="tab-btn" data-tab="tutorial">📖 학습 모드</button>
-      <button class="tab-btn" data-tab="practice">🎯 연습 모드</button>
-      <button class="tab-btn active" data-tab="production">⚡ 실전 모드</button>
-      <button class="tab-btn" data-tab="mydocs">📋 문서 관리</button>
-      <button class="tab-btn admin-only" data-tab="admin" style="display:none;">🔐 결재/관리 <span
-          class="pending-count-badge" id="pendingBadge" style="display:none;">0</span></button>
-      <button class="tab-btn" data-tab="reference">📚 증빙 가이드</button>
-    </nav>
-
-    <!-- Tab Panels -->
-    <main class="tab-panels">
-
-      <!-- 학습 모드 -->
-      <section class="tab-panel" id="panelTutorial">
-        <div class="section-header">
-          <div class="section-title-wrap">
-            <h2 class="section-title">📖 경비 처리 업무 절차 (인수인계서 기준)</h2>
-            <button class="btn btn-outline btn-sm" id="btnOverallOverview">🏥 업무 전체 개요</button>
-          </div>
-          <p class="section-subtitle">각 단계를 클릭하여 상세 내용과 퀴즈를 확인하세요.</p>
-          <div class="tutorial-search-wrap">
-            <input type="text" id="tutorialSearchInput" class="form-input"
-              placeholder="💡 업무 단계, 비목, 시스템명 검색 (예: 재료비, 결의서, 이지바로)">
-          </div>
-        </div>
-        <div id="workflowContainer" class="workflow-container"></div>
-      </section>
-
-      <!-- 연습 모드 -->
-      <section class="tab-panel" id="panelPractice">
-        <div class="section-header">
-          <h2 class="section-title">🎯 시나리오 기반 시뮬레이션</h2>
-          <p class="section-subtitle">실제와 유사한 상황에서 경비 처리 업무를 연습하세요. 엑셀 기록 예시도 확인할 수 있습니다.</p>
-        </div>
-        <div class="scenario-grid" id="scenarioGrid"></div>
-
-        <!-- 2025 Expense Reference -->
-        <div class="section-header" style="margin-top:40px;">
-          <h2 class="section-title">📊 2025년 지출내역 참조</h2>
-          <p class="section-subtitle">2025년 ER바이오코어사업단 지출내역 데이터입니다. 2026년 예산 관리에 참고하세요.</p>
-        </div>
-        <div id="expenseRefContainer"></div>
-      </section>
-
-      <!-- 실전 모드 -->
-      <section class="tab-panel active" id="panelProduction">
-        <div class="section-header">
-          <h2 class="section-title">⚡ 결의서 작성 & 엑셀 내보내기</h2>
-          <p class="section-subtitle">결의서를 작성하고 저장/제출하세요. PDF 인쇄 또는 지출내역 엑셀 형식으로 내보내기도 가능합니다.</p>
-        </div>
-
-        <!-- Resolution Type Selector -->
-        <div class="resolution-types">
-          <button class="resolution-type-btn active" data-type="expense_resolution">
-            <span class="res-icon">💸</span>
-            <span class="res-name">지출결의서</span>
-          </button>
-          <button class="resolution-type-btn" data-type="income_resolution">
-            <span class="res-icon">💰</span>
-            <span class="res-name">수입결의서</span>
-          </button>
-          <button class="resolution-type-btn" data-type="substitute_resolution">
-            <span class="res-icon">🔄</span>
-            <span class="res-name">대체결의서</span>
-          </button>
-        </div>
-
-        <!-- Form Editor -->
-        <div class="form-editor">
-          <div class="form-editor-header">
-            <h3 id="formEditorTitle">지출결의서</h3>
-            <div class="form-actions">
-              <button class="btn btn-outline" id="btnPreview">👁️ 미리보기</button>
-              <button class="btn btn-success" id="btnSaveDoc">💾 저장</button>
-              <button class="btn btn-primary" id="btnSubmitDoc">📤 제출</button>
-              <button class="btn btn-outline" id="btnPDF">📄 PDF 인쇄</button>
-              <button class="btn btn-outline" id="btnExcel">📊 엑셀 내보내기</button>
+      <div class="content-scroller">
+        <!-- Dashboard Stats (Global) -->
+        <div class="dashboard-area">
+          <div class="dashboard">
+            <div class="stat-card">
+              <div class="stat-icon">📖</div>
+              <div class="stat-value" id="statSteps">0/7</div>
+              <div class="stat-label">학습 완료</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📝</div>
+              <div class="stat-value" id="statQuiz">0%</div>
+              <div class="stat-label">퀴즈 정답률</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🎯</div>
+              <div class="stat-value" id="statScenarios">0/4</div>
+              <div class="stat-label">시나리오 완료</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📄</div>
+              <div class="stat-value" id="statDocs">0</div>
+              <div class="stat-label">생성 문서</div>
             </div>
           </div>
-          <div id="formEditorBody" class="form-editor-body"></div>
+          <div class="tasks-container" id="tasksContainer"></div>
         </div>
 
-        <!-- Preview Modal -->
-        <div class="preview-modal" id="previewModal" style="display:none;">
-          <div class="preview-header">
-            <h3>📄 미리보기</h3>
-          </div>
-          <div id="previewContent" class="preview-content"></div>
+        <!-- (v5.2.29) Tabs moved to Sidebar -->
+
+        <!-- Tab Panels -->
+        <main class="tab-panels">
+
+          <!-- 학습 모드 -->
+          <section class="tab-panel" id="panelTutorial">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h2 class="section-title">📖 경비 처리 업무 절차 (인수인계서 기준)</h2>
+                <button class="btn btn-outline btn-sm" id="btnOverallOverview">🏥 업무 전체 개요</button>
+              </div>
+              <p class="section-subtitle">각 단계를 클릭하여 상세 내용과 퀴즈를 확인하세요.</p>
+              <div class="tutorial-search-wrap">
+                <input type="text" id="tutorialSearchInput" class="form-input"
+                  placeholder="💡 업무 단계, 비목, 시스템명 검색 (예: 재료비, 결의서, 이지바로)">
+              </div>
+            </div>
+            <div id="workflowContainer" class="workflow-container"></div>
+          </section>
+
+          <!-- 연습 모드 -->
+          <section class="tab-panel" id="panelPractice">
+            <div class="section-header">
+              <h2 class="section-title">🎯 시나리오 기반 시뮬레이션</h2>
+              <p class="section-subtitle">실제와 유사한 상황에서 경비 처리 업무를 연습하세요. 엑셀 기록 예시도 확인할 수 있습니다.</p>
+            </div>
+            <div class="scenario-grid" id="scenarioGrid"></div>
+
+            <!-- 2025 Expense Reference -->
+            <div class="section-header" style="margin-top:40px;">
+              <h2 class="section-title">📊 2025년 지출내역 참조</h2>
+              <p class="section-subtitle">2025년 ER바이오코어사업단 지출내역 데이터입니다. 2026년 예산 관리에 참고하세요.</p>
+            </div>
+            <div id="expenseRefContainer"></div>
+          </section>
+
+          <!-- 실전 모드 -->
+          <section class="tab-panel active" id="panelProduction">
+            <div class="section-header">
+              <h2 class="section-title">⚡ 결의서 작성 & 엑셀 내보내기</h2>
+              <p class="section-subtitle">결의서를 작성하고 저장/제출하세요. PDF 인쇄 또는 지출내역 엑셀 형식으로 내보내기도 가능합니다.</p>
+            </div>
+
+            <!-- Resolution Type Selector -->
+            <div class="resolution-types">
+              <button class="resolution-type-btn active" data-type="expense_resolution">
+                <span class="res-icon">💸</span>
+                <span class="res-name">지출결의서</span>
+              </button>
+              <button class="resolution-type-btn" data-type="income_resolution">
+                <span class="res-icon">💰</span>
+                <span class="res-name">수입결의서</span>
+              </button>
+              <button class="resolution-type-btn" data-type="substitute_resolution">
+                <span class="res-icon">🔄</span>
+                <span class="res-name">대체결의서</span>
+              </button>
+            </div>
+
+            <!-- Form Editor -->
+            <div class="form-editor">
+              <div class="form-editor-header">
+                <h3 id="formEditorTitle">지출결의서</h3>
+                <div class="form-actions">
+                  <button class="btn btn-outline" id="btnPreview">👁️ 미리보기</button>
+                  <button class="btn btn-success" id="btnSaveDoc">💾 저장</button>
+                  <button class="btn btn-primary" id="btnSubmitDoc">📤 제출</button>
+                  <button class="btn btn-outline" id="btnPDF">📄 PDF 인쇄</button>
+                  <button class="btn btn-outline" id="btnExcel">📊 엑셀 내보내기</button>
+                </div>
+              </div>
+              <div id="formEditorBody" class="form-editor-body"></div>
+            </div>
+
+            <!-- Preview Modal -->
+            <div class="preview-modal" id="previewModal" style="display:none;">
+              <div class="preview-header">
+                <h3>📄 미리보기</h3>
+              </div>
+              <div id="previewContent" class="preview-content"></div>
+            </div>
+          </section>
+
+          <!-- 문서 관리 -->
+          <section class="tab-panel" id="panelMyDocs">
+            <div class="section-header">
+              <h2 class="section-title">📋 내 문서 관리</h2>
+              <p class="section-subtitle">작성한 결의서를 조회·수정·삭제·제출할 수 있습니다.</p>
+            </div>
+            <div id="myDocsContainer"></div>
+          </section>
+
+          <!-- 결재/관리 (관리자 전용) -->
+          <section class="tab-panel admin-only" id="panelAdmin" style="display:none;">
+            <div class="section-header">
+              <h2 class="section-title">🔐 결재 & 관리</h2>
+              <p class="section-subtitle">제출된 문서를 결재하고, 사용자를 관리합니다.</p>
+            </div>
+
+            <!-- Export with date range -->
+            <div class="export-panel">
+              <h3>📊 기간별 엑셀 내보내기</h3>
+              <div class="export-controls">
+                <label>시작일 <input type="date" id="exportStart" class="form-input"></label>
+                <label>종료일 <input type="date" id="exportEnd" class="form-input"></label>
+                <label>상태
+                  <select id="exportStatus" class="form-select">
+                    <option value="전체">전체</option>
+                    <option value="승인">승인</option>
+                    <option value="반려">반려</option>
+                    <option value="제출">제출</option>
+                    <option value="작성중">작성중</option>
+                  </select>
+                </label>
+                <button class="btn btn-success btn-sm" id="btnExportFiltered">📊 내보내기</button>
+              </div>
+            </div>
+
+            <div id="approvalContainer"></div>
+            <div id="approvalHistoryContainer" style="margin-top:32px;"></div>
+            <div id="userMgmtContainer" style="margin-top:32px;"></div>
+          </section>
+
+          <!-- 증빙 가이드 -->
+          <section class="tab-panel" id="panelReference">
+            <div class="section-header">
+              <h2 class="section-title">📚 증빙서류 가이드</h2>
+              <p class="section-subtitle">경비 처리에 필요한 증빙서류 유형과 용도를 안내합니다. 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
+            </div>
+            <div class="doc-grid" id="docGrid"></div>
+          </section>
+        </main>
+      </div>
+
+      <!-- Document Detail Modal -->
+      <div class="doc-detail-overlay" id="docDetailModal" style="display:none;">
+        <div class="doc-detail-modal">
+          <button class="doc-detail-close" onclick="window.app.closeDocDetail()">✕</button>
+          <div id="docDetailContent"></div>
         </div>
-      </section>
+      </div>
 
-      <!-- 문서 관리 -->
-      <section class="tab-panel" id="panelMyDocs">
-        <div class="section-header">
-          <h2 class="section-title">📋 내 문서 관리</h2>
-          <p class="section-subtitle">작성한 결의서를 조회·수정·삭제·제출할 수 있습니다.</p>
-        </div>
-        <div id="myDocsContainer"></div>
-      </section>
+      <!-- Cloud Status Indicator -->
+      <div id="cloudStatus" class="cloud-status"></div>
 
-      <!-- 결재/관리 (관리자 전용) -->
-      <section class="tab-panel admin-only" id="panelAdmin" style="display:none;">
-        <div class="section-header">
-          <h2 class="section-title">🔐 결재 & 관리</h2>
-          <p class="section-subtitle">제출된 문서를 결재하고, 사용자를 관리합니다.</p>
-        </div>
+      <!-- Toast -->
+      <div class="toast" id="toast"></div>
 
-        <!-- Export with date range -->
-        <div class="export-panel">
-          <h3>📊 기간별 엑셀 내보내기</h3>
-          <div class="export-controls">
-            <label>시작일 <input type="date" id="exportStart" class="form-input"></label>
-            <label>종료일 <input type="date" id="exportEnd" class="form-input"></label>
-            <label>상태
-              <select id="exportStatus" class="form-select">
-                <option value="전체">전체</option>
-                <option value="승인">승인</option>
-                <option value="반려">반려</option>
-                <option value="제출">제출</option>
-                <option value="작성중">작성중</option>
-              </select>
-            </label>
-            <button class="btn btn-success btn-sm" id="btnExportFiltered">📊 내보내기</button>
-          </div>
-        </div>
+      <script type="module" src="js/app.js"></script>
+      <script>
+        // [v5.2.28 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
+        setTimeout(() => {
+          const mainApp = document.getElementById('mainApp');
+          const loginOverlay = document.getElementById('loginOverlay');
 
-        <div id="approvalContainer"></div>
-        <div id="approvalHistoryContainer" style="margin-top:32px;"></div>
-        <div id="userMgmtContainer" style="margin-top:32px;"></div>
-      </section>
+          // 실제 브라우저에 표시되는지 확인 (ComputedStyle 기준)
+          const isMainHidden = window.getComputedStyle(mainApp).display === 'none';
+          const isLoginHidden = window.getComputedStyle(loginOverlay).display === 'none';
 
-      <!-- 증빙 가이드 -->
-      <section class="tab-panel" id="panelReference">
-        <div class="section-header">
-          <h2 class="section-title">📚 증빙서류 가이드</h2>
-          <p class="section-subtitle">경비 처리에 필요한 증빙서류 유형과 용도를 안내합니다. 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
-        </div>
-        <div class="doc-grid" id="docGrid"></div>
-      </section>
-    </main>
-  </div>
-
-  <!-- Document Detail Modal -->
-  <div class="doc-detail-overlay" id="docDetailModal" style="display:none;">
-    <div class="doc-detail-modal">
-      <button class="doc-detail-close" onclick="window.app.closeDocDetail()">✕</button>
-      <div id="docDetailContent"></div>
-    </div>
-  </div>
-
-  <!-- Cloud Status Indicator -->
-  <div id="cloudStatus" class="cloud-status"></div>
-
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-
-  <script type="module" src="js/app.js"></script>
-  <script>
-    // [v5.2.28 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
-    setTimeout(() => {
-      const mainApp = document.getElementById('mainApp');
-      const loginOverlay = document.getElementById('loginOverlay');
-
-      // 실제 브라우저에 표시되는지 확인 (ComputedStyle 기준)
-      const isMainHidden = window.getComputedStyle(mainApp).display === 'none';
-      const isLoginHidden = window.getComputedStyle(loginOverlay).display === 'none';
-
-      if (isMainHidden && isLoginHidden) {
-        console.warn('⚠️ Critical load hang. UI is completely invisible.');
-        const btn = document.createElement('div');
-        btn.id = 'emergency-fix-btn';
-        btn.style = 'position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
-        btn.innerHTML = '⚙️ 시스템 강제 복구 (데이터 초기화)';
-        btn.onclick = () => { if (confirm('시스템을 초기화합니다.')) { localStorage.clear(); location.reload(true); } };
-        document.body.appendChild(btn);
-      }
-    }, 10000);
-  </script>
+          if (isMainHidden && isLoginHidden) {
+            console.warn('⚠️ Critical load hang. UI is completely invisible.');
+            const btn = document.createElement('div');
+            btn.id = 'emergency-fix-btn';
+            btn.style = 'position:fixed;bottom:10px;right:10px;z-index:9999;background:var(--error);padding:10px;border-radius:5px;font-size:0.8rem;color:white;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            btn.innerHTML = '⚙️ 시스템 강제 복구 (데이터 초기화)';
+            btn.onclick = () => { if (confirm('시스템을 초기화합니다.')) { localStorage.clear(); location.reload(true); } };
+            document.body.appendChild(btn);
+          }
+        }, 10000);
+      </script>
 </body>
 
 </html>
