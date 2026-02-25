@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.2.26">
+  <link rel="stylesheet" href="css/style.css?v=5.2.27">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -23,18 +23,8 @@
       alert("🔴 시스템 초기화 오류 발생!\n\n메시지: " + msg + "\n위치: " + url + ":" + line + (col ? ":" + col : ""));
       return false;
     };
-    alert('✅ 브라우저 감시 시스템 가동 중 (v5.2.26)');
-    // 💡 모듈 로드 오류를 잡기 위한 추가 감시 장치
-    window.addEventListener('error', function (e) {
-      if (e.target.tagName === 'SCRIPT') {
-        const isFileProtocol = window.location.protocol === 'file:';
-        if (isFileProtocol) {
-          alert('🔴 보안 정책으로 실행이 차단되었습니다.\n\n현대적 브라우저는 로컬 파일을 직접 열 때 기능을 제한합니다.\n반드시 폴더 내의 [run_server.bat]을 실행하여 접속해 주세요!');
-        } else {
-          alert('🔴 스크립트 로드 실패: ' + e.target.src);
-        }
-      }
-    }, true);
+    // Production: alert() 진단 코드 제거
+    console.log("🚀 [System] Diagnostic initialization complete (v5.2.27).");
     console.log("🚀 [System] Diagnostic initialization complete.");
   </script>
 
@@ -43,7 +33,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.26</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.27</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -278,7 +268,7 @@
 
   <script type="module" src="js/app.js"></script>
   <script>
-    // [v5.2.26 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
+    // [v5.2.27 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
     setTimeout(() => {
       const mainApp = document.getElementById('mainApp');
       const loginOverlay = document.getElementById('loginOverlay');
