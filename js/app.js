@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.29.5';
+const APP_VERSION = 'v5.2.29.6';
 
-console.log('📦 [app.js] Module load start (v5.2.29.5)');
+console.log('📦 [app.js] Module load start (v5.2.29.6)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -212,12 +212,13 @@ class App {
                 ]);
             };
 
-            // 1. Wait for bootstrap and store (max 3s)
+            // 1. Wait for bootstrap and store (max 5s)
             console.log('🔄 Init Phase 1: Bootstrap & Store');
             await withTimeout(Promise.all([
                 this.auth.bootstrapReady,
-                this.store.ready
-            ]), 3000, 'Cloud Initialization');
+                this.store.ready,
+                this.tutorial.loadProgress() // Load tutorial progress early
+            ]), 5000, 'Cloud Initialization');
 
             // 2. Fetch Users (max 2s)
             console.log('🔄 Init Phase 2: User Fetch');
@@ -232,7 +233,7 @@ class App {
             const taskContainer = document.getElementById('tasksContainer');
             if (taskContainer) {
                 console.log('🔄 Init Phase 4: Task Render');
-                await withTimeout(this.taskMgr.render(taskContainer), 2000, 'Task Render');
+                await withTimeout(this.taskMgr.render(taskContainer), 3000, 'Task Render');
             }
 
             // Load extra data
@@ -278,7 +279,7 @@ class App {
 
                         const { error } = await withTimeout(
                             this.auth.supabase.from('users').select('id').limit(1),
-                            1000
+                            5000
                         );
                         if (error) throw error;
                         cloudIndicator.className = 'cloud-indicator online';

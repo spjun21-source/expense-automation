@@ -412,7 +412,15 @@ class TaskManager {
         const mainStats = this.getStatsByData(tasks);
         const dailyComments = await this._loadComments(this.currentDate);
 
-        // ... (userChipsHtml logic remains)
+        // 상단 사용자 필터 칩 구성 (v5.2.29)
+        const userChipsHtml = this.isAdmin ? `
+            <div class="user-filter-chips">
+                <div class="user-chip ${!this.filterUserId ? 'active' : ''}" data-filter-uid="">전체보기</div>
+                ${this.allUserIds.map(uid => `
+                    <div class="user-chip ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">${uid}</div>
+                `).join('')}
+            </div>
+        ` : '';
 
         // ... header and stats 
 
@@ -454,7 +462,7 @@ class TaskManager {
                 ${tasks.length === 0 ? '<div class="tasks-empty">데이터가 없습니다.</div>' : tasks.map(t => this._renderTask(t, isToday)).join('')}
             </div>
 
-            <div class="tasks-comment-area v5-2-29">
+            <div class="tasks-comment-area v5-2-29-6">
                 <div class="comment-header">
                     <span class="comment-title">📝 ${this.isAdmin ? '관리자 지시사항' : '팀 비망록'}</span>
                 </div>
