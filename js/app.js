@@ -1,4 +1,4 @@
-const APP_VERSION = 'v5.2.31';
+const APP_VERSION = 'v5.2.31.1';
 
 console.log('📦 [app.js] Module load start (v5.2.31)');
 

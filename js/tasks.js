@@ -136,7 +136,7 @@ class TaskManager {
         if (this.container) this.render(this.container);
     }
 
-    async _loadComments(date) {
+        async _loadComments(date) {
         if (this.supabase) {
             try {
                 const { data, error } = await this._withTimeout(
@@ -156,7 +156,9 @@ class TaskManager {
                 console.warn('⚠️ [Tasks] Comments load failed:', e.message);
             }
         }
-        return JSON.parse(localStorage.getItem(this._commentKey(date)) || '[]');
+        try {
+            return JSON.parse(localStorage.getItem(this._commentKey(date)) || '[]');
+        } catch { return []; }
     }
 
     async deleteComment(commentId) {
@@ -483,7 +485,6 @@ class TaskManager {
           </div>
         `;
 
-        container.innerHTML = html;
         this._bindEvents(container);
     }
 
