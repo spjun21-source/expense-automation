@@ -64,7 +64,8 @@ class App {
 
     _bindStaticEvents() {
         // 탭 전환 이벤트 (즉시 바인딩)
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        // v5.2.29: Sidebar Navigation Events
+        document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
@@ -91,7 +92,7 @@ class App {
         const loginOverlay = document.getElementById('loginOverlay');
         const mainApp = document.getElementById('mainApp');
         if (loginOverlay) loginOverlay.style.display = 'none';
-        if (mainApp) mainApp.style.display = 'block';
+        if (mainApp) mainApp.style.display = 'flex';
 
         // 즉시 탭 구조 렌더링 (데이터는 비동기 로딩)
         this.switchTab(this.currentTab);
