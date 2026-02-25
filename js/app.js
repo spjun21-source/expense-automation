@@ -1,16 +1,16 @@
-const APP_VERSION = 'v5.2.22';
+const APP_VERSION = 'v5.2.23';
 
-console.log('📦 [app.js] Module load start (v5.2.22)');
+console.log('📦 [app.js] Module load start (v5.2.23)');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.22';
-import { TutorialEngine } from './tutorial.js?v=5.2.22';
-import { FormManager } from './forms.js?v=5.2.22';
-import { AuthManager } from './auth.js?v=5.2.22';
-import { DocumentStore } from './store.js?v=5.2.22';
-import { TaskManager } from './tasks.js?v=5.2.22';
-import { ApprovalManager } from './approval.js?v=5.2.22';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.23';
+import { TutorialEngine } from './tutorial.js?v=5.2.23';
+import { FormManager } from './forms.js?v=5.2.23';
+import { AuthManager } from './auth.js?v=5.2.23';
+import { DocumentStore } from './store.js?v=5.2.23';
+import { TaskManager } from './tasks.js?v=5.2.23';
+import { ApprovalManager } from './approval.js?v=5.2.23';
 
-alert('🚀 시스템 엔진 가동 (v5.2.22)');
+alert('🚀 시스템 엔진 가동 (v5.2.23)');
 
 class App {
     constructor() {
@@ -182,14 +182,17 @@ class App {
             };
 
             // 1. Wait for bootstrap and store (max 3s)
+            console.log('🔄 Init Phase 1: Bootstrap & Store');
             await withTimeout(Promise.all([
                 this.auth.bootstrapReady,
                 this.store.ready
             ]), 3000, 'Cloud Initialization');
 
             // 2. Fetch Users (max 2s)
+            console.log('🔄 Init Phase 2: User Fetch');
             const users = await withTimeout(this.auth.getUsers(), 2000, 'User Fetch');
 
+            console.log('🔄 Init Phase 3: TaskManager Setup');
             this.taskMgr = new TaskManager(user.id, {
                 isAdmin: this.auth.isAdmin(),
                 allUserIds: users.map(u => u.id)
@@ -197,10 +200,12 @@ class App {
 
             const taskContainer = document.getElementById('tasksContainer');
             if (taskContainer) {
+                console.log('🔄 Init Phase 4: Task Render');
                 await withTimeout(this.taskMgr.render(taskContainer), 2000, 'Task Render');
             }
 
             // Load extra data
+            console.log('🔄 Init Phase 5: Extra Data');
             await this.loadExpenseData();
             console.log('✅ [App] All Data Loaded Successfully');
         } catch (err) {

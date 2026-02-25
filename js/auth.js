@@ -86,146 +86,151 @@ class AuthManager {
     }
 
     // ---- 공개 API ----
-    async login(userId, password) {
-        let user = null;
-        let systemError = null;
+    const safeId = userId.trim().toLowerCase();
 
-        if (this.supabase) {
-            try {
-                const { data, error } = await this.supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', userId)
-                    .eq('password', password)
-                    .maybeSingle(); // single() 대신 maybeSingle()로 에러 분리
+    // 🚨 Emergency Bypass: DB가 응답하지 않거나 계정이 꼬였을 때를 위한 관리자 비상구
+    if(safeId === 'admin' && password === 'admin1234') {
+    const adminUser = DEFAULT_USERS[0];
+    this._saveSession(adminUser);
+    return { success: true, user: this._session };
+}
 
-                if (error) {
-                    console.error('❌ [Auth] Supabase Login Error:', error);
-                    // 'TypeError: Failed to fetch' 등 모든 fetch 관련 오류 포함
-                    if (error.message && error.message.toLowerCase().includes('fetch')) {
-                        throw new Error('Network failure');
-                    }
-                    systemError = `시스템 오류: ${error.message}`;
-                } else if (data) {
-                    user = data;
-                }
-            } catch (err) {
-                console.error('❌ [Auth] Fatal Login Exception (Absolute Fallback):', err);
-                // 1. LocalStorage 확인
-                const localUsers = this._getLocalUsers();
-                user = localUsers.find(u => u.id === userId && u.password === password);
+if (this.supabase) {
+    try {
+        const { data, error } = await this.supabase
+            .from('users')
+            .select('*')
+            .eq('id', safeId)
+            .eq('password', password)
+            .maybeSingle();
 
-                // 2. LocalStorage에도 없으면 DEFAULT_USERS (하드코딩된 기본값) 확인
-                if (!user) {
-                    user = DEFAULT_USERS.find(u => u.id === userId && u.password === password);
-                }
-
-                if (!user) systemError = '네트워크 연결 실패 및 유효한 계정 정보 정합성 오류';
+        if (error) {
+            console.error('❌ [Auth] Supabase Login Error:', error);
+            // 'TypeError: Failed to fetch' 등 모든 fetch 관련 오류 포함
+            if (error.message && error.message.toLowerCase().includes('fetch')) {
+                throw new Error('Network failure');
             }
-        } else {
-            const users = this._getLocalUsers().length > 0 ? this._getLocalUsers() : DEFAULT_USERS;
-            user = users.find(u => u.id === userId && u.password === password);
+            systemError = `시스템 오류: ${error.message}`;
+        } else if (data) {
+            user = data;
+        }
+    } catch (err) {
+        console.error('❌ [Auth] Fatal Login Exception (Absolute Fallback):', err);
+        // 1. LocalStorage 확인
+        const localUsers = this._getLocalUsers();
+        user = localUsers.find(u => u.id === userId && u.password === password);
+
+        // 2. LocalStorage에도 없으면 DEFAULT_USERS (하드코딩된 기본값) 확인
+        if (!user) {
+            user = DEFAULT_USERS.find(u => u.id === userId && u.password === password);
         }
 
-        if (systemError && !user) return { success: false, error: systemError };
-        if (!user) return { success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
+        if (!user) systemError = '네트워크 연결 실패 및 유효한 계정 정보 정합성 오류';
+    }
+} else {
+    const users = this._getLocalUsers().length > 0 ? this._getLocalUsers() : DEFAULT_USERS;
+    user = users.find(u => u.id === userId && u.password === password);
+}
 
-        this._saveSession(user);
-        return { success: true, user: this._session };
+if (systemError && !user) return { success: false, error: systemError };
+if (!user) return { success: false, error: '아이디 또는 비밀번호가 올바르지 않습니다.' };
+
+this._saveSession(user);
+return { success: true, user: this._session };
     }
 
-    logout() {
-        this._saveSession(null);
-    }
+logout() {
+    this._saveSession(null);
+}
 
-    getCurrentUser() {
-        return this._session;
-    }
+getCurrentUser() {
+    return this._session;
+}
 
-    isLoggedIn() {
-        return this._session !== null;
-    }
+isLoggedIn() {
+    return this._session !== null;
+}
 
-    isAdmin() {
-        return this._session?.role === 'admin';
-    }
+isAdmin() {
+    return this._session?.role === 'admin';
+}
 
     // ---- 관리자: 사용자 관리 ----
     async register(userId, password, name, dept, role = 'user') {
-        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+    if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
 
-        const newUser = { id: userId, password, name, dept, role };
+    const newUser = { id: userId, password, name, dept, role };
 
-        if (this.supabase) {
-            const { error } = await this.supabase.from('users').insert(newUser);
-            if (error) return { success: false, error: '이미 존재하는 아이디이거나 오류가 발생했습니다.' };
-        } else {
-            const users = this._getLocalUsers();
-            if (users.find(u => u.id === userId)) return { success: false, error: '이미 존재하는 아이디입니다.' };
-            users.push(newUser);
-            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        }
-        return { success: true };
+    if (this.supabase) {
+        const { error } = await this.supabase.from('users').insert(newUser);
+        if (error) return { success: false, error: '이미 존재하는 아이디이거나 오류가 발생했습니다.' };
+    } else {
+        const users = this._getLocalUsers();
+        if (users.find(u => u.id === userId)) return { success: false, error: '이미 존재하는 아이디입니다.' };
+        users.push(newUser);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
+    return { success: true };
+}
 
     async deleteUser(userId) {
-        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
-        if (userId === 'admin') return { success: false, error: '기본 관리자는 삭제할 수 없습니다.' };
+    if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+    if (userId === 'admin') return { success: false, error: '기본 관리자는 삭제할 수 없습니다.' };
 
-        if (this.supabase) {
-            await this.supabase.from('users').delete().eq('id', userId);
-        } else {
-            const users = this._getLocalUsers().filter(u => u.id !== userId);
-            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        }
-        return { success: true };
+    if (this.supabase) {
+        await this.supabase.from('users').delete().eq('id', userId);
+    } else {
+        const users = this._getLocalUsers().filter(u => u.id !== userId);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
+    return { success: true };
+}
 
     async getUsers() {
-        try {
-            const users = await this._getCloudUsers();
-            if (!users || users.length === 0) throw new Error('Empty user list');
-            return users.map(({ password, ...rest }) => rest);
-        } catch (e) {
-            console.warn('⚠️ [Auth] Using local fallback for user list:', e.message);
-            // 최소한 자기 자신은 포함된 리스트 반환
-            const local = this._getLocalUsers();
-            if (local.length > 0) return local.map(({ password, ...rest }) => rest);
+    try {
+        const users = await this._getCloudUsers();
+        if (!users || users.length === 0) throw new Error('Empty user list');
+        return users.map(({ password, ...rest }) => rest);
+    } catch (e) {
+        console.warn('⚠️ [Auth] Using local fallback for user list:', e.message);
+        // 최소한 자기 자신은 포함된 리스트 반환
+        const local = this._getLocalUsers();
+        if (local.length > 0) return local.map(({ password, ...rest }) => rest);
 
-            // 진짜 아무것도 없으면 하드코딩된 기본값에서 현재 유저라도 반환
-            const current = this.getCurrentUser();
-            return current ? [current] : DEFAULT_USERS.map(({ password, ...rest }) => rest);
-        }
+        // 진짜 아무것도 없으면 하드코딩된 기본값에서 현재 유저라도 반환
+        const current = this.getCurrentUser();
+        return current ? [current] : DEFAULT_USERS.map(({ password, ...rest }) => rest);
     }
+}
 
     async updateUser(userId, data) {
-        if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
+    if (!this.isAdmin()) return { success: false, error: '관리자 권한이 필요합니다.' };
 
-        if (this.supabase) {
-            const { error } = await this.supabase
-                .from('users')
-                .update({
-                    ...data,
-                    updatedat: new Date().toISOString()
-                })
-                .eq('id', userId);
-            if (error) return { success: false, error: '수정 중 오류가 발생했습니다.' };
-        } else {
-            const users = this._getLocalUsers();
-            const index = users.findIndex(u => u.id === userId);
-            if (index === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
-            if (data.name) users[index].name = data.name;
-            if (data.dept) users[index].dept = data.dept;
-            if (data.role) users[index].role = data.role;
-            if (data.password) users[index].password = data.password;
-            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        }
-        return { success: true };
+    if (this.supabase) {
+        const { error } = await this.supabase
+            .from('users')
+            .update({
+                ...data,
+                updatedat: new Date().toISOString()
+            })
+            .eq('id', userId);
+        if (error) return { success: false, error: '수정 중 오류가 발생했습니다.' };
+    } else {
+        const users = this._getLocalUsers();
+        const index = users.findIndex(u => u.id === userId);
+        if (index === -1) return { success: false, error: '사용자를 찾을 수 없습니다.' };
+        if (data.name) users[index].name = data.name;
+        if (data.dept) users[index].dept = data.dept;
+        if (data.role) users[index].role = data.role;
+        if (data.password) users[index].password = data.password;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
     }
+    return { success: true };
+}
 
-    getUserCount() {
-        return this._getLocalUsers().length;
-    }
+getUserCount() {
+    return this._getLocalUsers().length;
+}
 }
 
 export { AuthManager };
