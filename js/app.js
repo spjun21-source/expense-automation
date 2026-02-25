@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.27';
+const APP_VERSION = 'v5.2.28';
 
-console.log('📦 [app.js] Module load start (v5.2.27)');
+console.log('📦 [app.js] Module load start (v5.2.28)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -10,7 +10,7 @@ import { DocumentStore } from './store.js';
 import { TaskManager } from './tasks.js';
 import { ApprovalManager } from './approval.js';
 
-// Production: alert() 제거
+// Production Ready
 
 class App {
     constructor() {
