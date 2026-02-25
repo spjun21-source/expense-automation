@@ -1,17 +1,16 @@
-const APP_VERSION = 'v5.2.21';
+const APP_VERSION = 'v5.2.22';
 
-// [v5.2.21 Diagnostic]
-console.log('📦 [app.js] Module load start...');
+console.log('📦 [app.js] Module load start (v5.2.22)');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
-import { TutorialEngine } from './tutorial.js';
-import { FormManager } from './forms.js';
-import { AuthManager } from './auth.js';
-import { DocumentStore } from './store.js';
-import { TaskManager } from './tasks.js';
-import { ApprovalManager } from './approval.js';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.22';
+import { TutorialEngine } from './tutorial.js?v=5.2.22';
+import { FormManager } from './forms.js?v=5.2.22';
+import { AuthManager } from './auth.js?v=5.2.22';
+import { DocumentStore } from './store.js?v=5.2.22';
+import { TaskManager } from './tasks.js?v=5.2.22';
+import { ApprovalManager } from './approval.js?v=5.2.22';
 
-alert('🚀 시스템 작동 준비 완료 (v5.2.21)');
+alert('🚀 시스템 엔진 가동 (v5.2.22)');
 
 class App {
     constructor() {
@@ -43,18 +42,24 @@ class App {
 
     async init() {
         console.log('🚀 App Initialization Started');
-        // 1. 즉시 필요한 UI 이벤트 바인딩 (로그인 전후 무관)
-        this._bindStaticEvents();
+        try {
+            // 🚨 최우선 순위: 로그인 버튼부터 살리기
+            this._bindLoginEvents();
 
-        // 2. 세션 체크 및 화면 전환
-        if (this.auth.isLoggedIn()) {
-            await this._showApp();
-        } else {
-            this._showLogin();
+            // 2. 부가 기능 바인딩
+            this._bindStaticEvents();
+
+            // 3. 현재 상태에 따라 화면 표시
+            if (this.auth.isLoggedIn()) {
+                await this._showApp();
+            } else {
+                this._showLogin();
+            }
+            console.log('✅ UI Initialization Success');
+        } catch (initErr) {
+            console.error('🛑 App Init Crash:', initErr);
+            alert(`🛑 초기화 진행 중 오류: ${initErr.message}`);
         }
-
-        // 3. 로그인 이벤트 바인딩
-        this._bindLoginEvents();
     }
 
     _bindStaticEvents() {
@@ -96,41 +101,52 @@ class App {
     }
 
     _bindLoginEvents() {
-        const loginBtn = document.getElementById('loginBtn');
-        const loginId = document.getElementById('loginId');
-        const loginPw = document.getElementById('loginPw');
-        const loginError = document.getElementById('loginError');
+        try {
+            const loginBtn = document.getElementById('loginBtn');
+            const loginId = document.getElementById('loginId');
+            const loginPw = document.getElementById('loginPw');
+            const loginError = document.getElementById('loginError');
 
-        const doLogin = async () => {
-            console.log('Btn-Login: Clicked');
-            if (loginBtn) {
+            if (!loginBtn) {
+                console.warn('⚠️ loginBtn not found in DOM');
+                return;
+            }
+
+            const doLogin = async () => {
+                console.log('⚡ Login Attempt Started');
                 loginBtn.disabled = true;
                 loginBtn.textContent = '로그인 중...';
-            }
-            try {
-                const result = await this.auth.login(loginId.value, loginPw.value);
-                if (result.success) {
-                    loginError.textContent = '';
-                    loginId.value = '';
-                    loginPw.value = '';
-                    await this._showApp();
-                } else {
-                    loginError.textContent = result.error;
-                }
-            } catch (err) {
-                console.error('Login UI Crash:', err);
-                loginError.textContent = `오류: ${err.message}`;
-            } finally {
-                if (loginBtn) {
+
+                try {
+                    const result = await this.auth.login(loginId.value, loginPw.value);
+                    if (result.success) {
+                        loginError.textContent = '';
+                        loginId.value = '';
+                        loginPw.value = '';
+                        await this._showApp();
+                    } else {
+                        loginError.textContent = result.error;
+                    }
+                } catch (err) {
+                    console.error('Login Process Crash:', err);
+                    alert(`⚠️ 로그인 통신 중 오류: ${err.message}`);
+                } finally {
                     loginBtn.disabled = false;
                     loginBtn.textContent = '로그인';
                 }
-            }
-        };
+            };
 
-        loginBtn?.addEventListener('click', doLogin);
-        loginPw?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-        loginId?.addEventListener('keydown', e => { if (e.key === 'Enter') loginPw?.focus(); });
+            // 기존 리스너 제거 시도 (중복 방지)
+            loginBtn.replaceWith(loginBtn.cloneNode(true));
+            const newLoginBtn = document.getElementById('loginBtn');
+            newLoginBtn.addEventListener('click', doLogin);
+
+            loginPw?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+            loginId?.addEventListener('keydown', e => { if (e.key === 'Enter') loginPw?.focus(); });
+            console.log('✅ Login Events Bound');
+        } catch (e) {
+            console.error('Login Event Binding Error:', e);
+        }
     }
 
     async _initApp() {

@@ -11,7 +11,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=5.2.21">
+  <link rel="stylesheet" href="css/style.css?v=5.2.22">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -23,10 +23,13 @@
       alert("🔴 시스템 초기화 오류 발생!\n\n메시지: " + msg + "\n위치: " + url + ":" + line + (col ? ":" + col : ""));
       return false;
     };
-    window.onunhandledrejection = function (event) {
-      alert("🔴 비동기 처리 오류 발생!\n\n원인: " + (event.reason ? event.reason.message || event.reason : "알 수 없음"));
-    };
-    alert('✅ 브라우저 감시 시스템 가동 중 (v5.2.21)');
+    alert('✅ 브라우저 감시 시스템 가동 중 (v5.2.22)');
+    // 💡 모듈 로드 오류를 잡기 위한 추가 감시 장치
+    window.addEventListener('error', function (e) {
+      if (e.target.tagName === 'SCRIPT') {
+        alert('🔴 스크립트 로드 실패: ' + e.target.src);
+      }
+    }, true);
     console.log("🚀 [System] Diagnostic initialization complete.");
   </script>
 
@@ -35,7 +38,7 @@
     <div class="login-modal">
       <div class="login-header">
         <div class="login-icon">🏥</div>
-        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.21</span>
+        <h2>사업단 경비 처리 자동화 <span style="font-size:0.45em; color:var(--text-dim); vertical-align:middle;">v5.2.22</span>
         </h2>
         <p>ER 바이오코어 사업단</p>
       </div>
@@ -268,10 +271,10 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script type="module" src="js/supabase.js?v=5.2.21"></script>
-  <script type="module" src="js/app.js?v=5.2.21"></script>
+  <script type="module" src="js/supabase.js?v=5.2.22"></script>
+  <script type="module" src="js/app.js?v=5.2.22"></script>
   <script>
-    // [v5.2.21 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
+    // [v5.2.22 Failsafe] 10초 이상 메인 화면/로그인 화면이 전혀 안 뜨면 강제 로드 유도
     setTimeout(() => {
       const mainApp = document.getElementById('mainApp');
       const loginOverlay = document.getElementById('loginOverlay');
