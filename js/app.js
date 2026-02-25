@@ -1,16 +1,16 @@
-const APP_VERSION = 'v5.2.23';
+const APP_VERSION = 'v5.2.24';
 
-console.log('📦 [app.js] Module load start (v5.2.23)');
+console.log('📦 [app.js] Module load start (v5.2.24)');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.23';
-import { TutorialEngine } from './tutorial.js?v=5.2.23';
-import { FormManager } from './forms.js?v=5.2.23';
-import { AuthManager } from './auth.js?v=5.2.23';
-import { DocumentStore } from './store.js?v=5.2.23';
-import { TaskManager } from './tasks.js?v=5.2.23';
-import { ApprovalManager } from './approval.js?v=5.2.23';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
+import { TutorialEngine } from './tutorial.js';
+import { FormManager } from './forms.js';
+import { AuthManager } from './auth.js';
+import { DocumentStore } from './store.js';
+import { TaskManager } from './tasks.js';
+import { ApprovalManager } from './approval.js';
 
-alert('🚀 시스템 엔진 가동 (v5.2.23)');
+alert('🚀 시스템 엔진 가동 (v5.2.24)');
 
 class App {
     constructor() {
