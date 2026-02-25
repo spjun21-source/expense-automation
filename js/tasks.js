@@ -109,6 +109,7 @@ class TaskManager {
             date: date || this.currentDate,
             content: comment.trim(),
             userId: this.userid, // v5.2.29: Standardized case
+            status: 'pending', // v5.2.31: Add status
             updatedAt: new Date().toISOString()
         };
 
@@ -148,7 +149,7 @@ class TaskManager {
                     return data.map(row => ({
                         ...row,
                         userId: row.userId || row.userid,
-                        updatedAt: row.updatedAt || row.updatedat
+                        status: row.status || 'pending'
                     }));
                 }
             } catch (e) {
@@ -428,16 +429,21 @@ class TaskManager {
         const commentsHtml = dailyComments.length === 0 ?
             '<div class="comments-empty">등록된 지시사항이나 비망록이 없습니다.</div>' :
             dailyComments.map((c, idx) => `
-                <div class="comment-item">
+                <div class="comment-item ${c.status === 'completed' ? 'completed' : ''}" data-cmt-id="${c.id}">
                     <div class="comment-seq">#${idx + 1}</div>
-                    <div class="comment-content-box">
+                    <div class="comment-body">
                         <div class="comment-text">${c.content}</div>
                         <div class="comment-meta">
-                            <span class="c-author">${c.userId}</span>
-                            <span class="c-time">${new Date(c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
-                            ${(c.userId === this.userid || this.isAdmin) ?
-                    `<button class="c-delete-btn" data-cmt-id="${c.id}">삭제</button>` : ''}
+                            👤 ${c.userId} | ${new Date(c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
+                    </div>
+                    <div class="comment-actions">
+                        <button class="btn-icon c-status-toggle" data-cmt-id="${c.id}" data-status="${c.status || 'pending'}" title="${c.status === 'completed' ? '대기상태로 변경' : '완료처리'}">
+                            ${c.status === 'completed' ? '✅' : '⏳'}
+                        </button>
+                        ${this.isAdmin || c.userId === this.userid ? `
+                            <button class="btn-icon c-delete-btn" data-cmt-id="${c.id}" title="삭제">🗑️</button>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -462,22 +468,54 @@ class TaskManager {
                 ${tasks.length === 0 ? '<div class="tasks-empty">데이터가 없습니다.</div>' : tasks.map(t => this._renderTask(t, isToday)).join('')}
             </div>
 
-            <div class="tasks-comment-area v5-2-29-6">
+            <div class="tasks-comment-area v5-2-31">
                 <div class="comment-header">
                     <span class="comment-title">📝 ${this.isAdmin ? '관리자 지시사항' : '팀 비망록'}</span>
+                </div>
+                <div class="comment-input-row">
+                    <input type="text" id="dailyCommentInput" placeholder="${this.isAdmin ? '지시사항을 입력하세요...' : '비망록을 입력하세요...'}" maxlength="500">
+                    <button class="btn btn-sm btn-primary" id="btnSaveComment">등록</button>
                 </div>
                 <div class="comments-timeline">
                     ${commentsHtml}
                 </div>
-                ${isToday ? `
-                <div class="comment-input-row">
-                    <input type="text" id="dailyCommentInput" placeholder="공유할 내용을 입력하세요..." maxlength="200">
-                    <button class="btn btn-primary btn-sm" id="btnSaveComment">등록</button>
-                </div>` : ''}
             </div>
           </div>
         `;
+
+        container.innerHTML = html;
         this._bindEvents(container);
+    }
+
+    async toggleCommentStatus(cmtId, currentStatus) {
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        if (this.supabase) {
+            try {
+                await this.supabase.from('task_comments').update({ status: newStatus }).eq('id', cmtId);
+            } catch (e) { console.error(e); }
+        }
+        // Local Sync
+        const local = JSON.parse(localStorage.getItem(this._commentKey()) || '[]');
+        const idx = local.findIndex(c => c.id === cmtId);
+        if (idx !== -1) {
+            local[idx].status = newStatus;
+            localStorage.setItem(this._commentKey(), JSON.stringify(local));
+        }
+        if (this.container) this.render(this.container);
+    }
+
+    async deleteComment(cmtId) {
+        if (!confirm('지시사항을 삭제하시겠습니까?')) return;
+        if (this.supabase) {
+            try {
+                await this.supabase.from('task_comments').delete().eq('id', cmtId);
+            } catch (e) { console.error(e); }
+        }
+        // Local Sync
+        const local = JSON.parse(localStorage.getItem(this._commentKey()) || '[]');
+        const filtered = local.filter(c => c.id !== cmtId);
+        localStorage.setItem(this._commentKey(), JSON.stringify(filtered));
+        if (this.container) this.render(this.container);
     }
 
     _renderTask(task, editable) {
@@ -568,6 +606,15 @@ class TaskManager {
             btn.addEventListener('click', async () => {
                 const id = btn.dataset.cmtId;
                 await this.deleteComment(id);
+            });
+        });
+
+        // 비망록 토글 (v5.2.31)
+        container.querySelectorAll('.c-status-toggle').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.cmtId;
+                const status = btn.dataset.status;
+                await this.toggleCommentStatus(id, status);
             });
         });
 

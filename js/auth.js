@@ -56,7 +56,7 @@ class AuthManager {
     async _getCloudUsers() {
         if (!this.supabase) return this._getLocalUsers();
         try {
-            const { data, error } = await this.supabase.from('users').select('*');
+            const { data, error } = await this.supabase.from('users').select('*').order('id');
             if (error) throw error;
             this._cachedUsers = data;
             // Sync to local

@@ -2890,8 +2890,7 @@ body {
 
 /* --- Dashboard Area with Tasks --- */
 
-.dashboard-area {
-  max-width: 1300px;
+.dashboard-area { max-width: 1400px;
   margin: 16px auto 32px;
   padding: 0 32px;
   display: flex;
@@ -5527,4 +5526,30 @@ body {
 .usermgmt-table td {
   padding: 10px;
   border-bottom: 1px solid var(--border);
+}
+/* v5.2.31: Comment Status & Action Styles */
+.comment-item.completed {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+  background: rgba(255, 255, 255, 0.02);
+}
+.comment-item.completed .comment-text {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+.comment-item .btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: var(--transition);
+}
+.comment-item .btn-icon:hover {
+  background: var(--bg-card-hover);
+  transform: scale(1.1);
+}
+.comment-item .c-status-toggle {
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.1));
 }
