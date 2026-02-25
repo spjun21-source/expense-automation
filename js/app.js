@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.29.2';
+const APP_VERSION = 'v5.2.29.3';
 
-console.log('📦 [app.js] Module load start (v5.2.29)');
+console.log('📦 [app.js] Module load start (v5.2.29.3)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -15,16 +15,13 @@ import { ApprovalManager } from './approval.js';
 class App {
     constructor() {
         console.log('⚡ [App] Constructor started');
+        this._updateDiagnostic('Core 엔진 로딩 중...');
+
         try {
-            console.log('1. AuthManager init');
             this.auth = new AuthManager();
-            console.log('2. DocumentStore init');
             this.store = new DocumentStore();
-            console.log('3. TutorialEngine init');
             this.tutorial = new TutorialEngine();
-            console.log('4. FormManager init');
             this.formManager = new FormManager();
-            console.log('5. ApprovalManager init');
             this.approvalMgr = new ApprovalManager(this.store);
 
             this.taskMgr = null;
@@ -32,16 +29,24 @@ class App {
             this.expenseData = [];
             this.editingDocId = null;
 
-            console.log('6. Calling init()');
             this.init();
         } catch (err) {
             console.error('🛑 [App] Constructor Crash:', err);
+            this._updateDiagnostic(`초기화 오류: ${err.message}`);
             alert(`🛑 초기화 실패 (Constructor): ${err.message}`);
         }
     }
 
+    _updateDiagnostic(msg) {
+        const el = document.getElementById('systemDiagnostic');
+        if (el) el.textContent = msg;
+        console.log(`[Diagnostic] ${msg}`);
+    }
+
     async init() {
         console.log('🚀 App Initialization Started');
+        this._updateDiagnostic('이벤트 바인딩 중...');
+
         try {
             // 🚨 최우선 순위: 로그인 버튼부터 살리기
             this._bindLoginEvents();
@@ -51,14 +56,16 @@ class App {
 
             // 3. 현재 상태에 따라 화면 표시
             if (this.auth.isLoggedIn()) {
+                this._updateDiagnostic('세션 확인됨. 앱 로드 중...');
                 await this._showApp();
             } else {
+                this._updateDiagnostic('시스템 준비 완료 (로그인 필요)');
                 this._showLogin();
             }
             console.log('✅ UI Initialization Success');
         } catch (initErr) {
             console.error('🛑 App Init Crash:', initErr);
-            alert(`🛑 초기화 진행 중 오류: ${initErr.message}`);
+            this._updateDiagnostic(`실행 오류: ${initErr.message}`);
         }
     }
 
