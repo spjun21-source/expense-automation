@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.29.6';
+const APP_VERSION = 'v5.2.30';
 
-console.log('📦 [app.js] Module load start (v5.2.29.6)');
+console.log('📦 [app.js] Module load start (v5.2.30)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
