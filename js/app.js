@@ -1,4 +1,4 @@
-const APP_VERSION = 'v5.2.29';
+const APP_VERSION = 'v5.2.29.2';
 
 console.log('📦 [app.js] Module load start (v5.2.29)');
 
@@ -103,50 +103,73 @@ class App {
 
     _bindLoginEvents() {
         try {
+            console.log('🔄 [App] Binding Login Events');
             const loginBtn = document.getElementById('loginBtn');
             const loginId = document.getElementById('loginId');
             const loginPw = document.getElementById('loginPw');
             const loginError = document.getElementById('loginError');
 
             if (!loginBtn) {
-                console.warn('⚠️ loginBtn not found in DOM');
+                console.error('❌ [App] loginBtn not found! App initialization might be compromised.');
                 return;
             }
 
             const doLogin = async () => {
-                console.log('⚡ Login Attempt Started');
-                loginBtn.disabled = true;
-                loginBtn.textContent = '로그인 중...';
+                // 부착된 시점의 요소를 다시 찾아서 쓰도록 (상태 불일치 방지)
+                const currentBtn = document.getElementById('loginBtn');
+                const currentId = document.getElementById('loginId');
+                const currentPw = document.getElementById('loginPw');
+                const currentError = document.getElementById('loginError');
+
+                if (!currentBtn || !currentId || !currentPw) {
+                    console.error('❌ [App] Login elements gone during click!');
+                    return;
+                }
+
+                console.log('⚡ [App] Login Attempt Started:', currentId.value);
+                currentBtn.disabled = true;
+                currentBtn.textContent = '로그인 중...';
 
                 try {
-                    const result = await this.auth.login(loginId.value, loginPw.value);
+                    const result = await this.auth.login(currentId.value, currentPw.value);
+                    console.log('📝 [App] Login Result:', result.success ? 'Success' : 'Fail');
+
                     if (result.success) {
-                        loginError.textContent = '';
-                        loginId.value = '';
-                        loginPw.value = '';
+                        currentError.textContent = '';
+                        currentId.value = '';
+                        currentPw.value = '';
                         await this._showApp();
                     } else {
-                        loginError.textContent = result.error;
+                        currentError.textContent = result.error;
                     }
                 } catch (err) {
-                    console.error('Login Process Crash:', err);
+                    console.error('❌ [App] Login Process Crash:', err);
                     alert(`⚠️ 로그인 통신 중 오류: ${err.message}`);
                 } finally {
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = '로그인';
+                    const finalBtn = document.getElementById('loginBtn');
+                    if (finalBtn) {
+                        finalBtn.disabled = false;
+                        finalBtn.textContent = '로그인';
+                    }
                 }
             };
 
-            // 기존 리스너 제거 시도 (중복 방지)
+            // 기존 리스너 제거 (이 과정에서 복제되므로 함수 내부에선 다시 getElementById 해야함)
             loginBtn.replaceWith(loginBtn.cloneNode(true));
-            const newLoginBtn = document.getElementById('loginBtn');
-            newLoginBtn.addEventListener('click', doLogin);
+            const activeBtn = document.getElementById('loginBtn');
+            activeBtn.onclick = null; // 인라인 핸들러 제거
+            activeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                doLogin();
+            });
 
+            // Input 엔터키 바인딩
             loginPw?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
             loginId?.addEventListener('keydown', e => { if (e.key === 'Enter') loginPw?.focus(); });
-            console.log('✅ Login Events Bound');
+
+            console.log('✅ [App] Login Events Bound Successfully');
         } catch (e) {
-            console.error('Login Event Binding Error:', e);
+            console.error('❌ [App] Login Event Binding Fatal Error:', e);
         }
     }
 
