@@ -24,7 +24,7 @@ class FormManager {
       try {
         const { data, error } = await supabase
           .from('user_progress')
-          .select('docCount')
+          .select('doccount')
           .eq('userid', userId)
           .single();
         if (!error && data) {
