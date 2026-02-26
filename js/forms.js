@@ -28,7 +28,7 @@ class FormManager {
           .eq('userid', userId)
           .single();
         if (!error && data) {
-          this.generatedDocs = data.docCount || 0;
+          this.generatedDocs = data.doccount || 0;
           return;
         }
       } catch (e) { }
@@ -42,7 +42,7 @@ class FormManager {
       try {
         await supabase
           .from('user_progress')
-          .upsert({ userid: userId, docCount: this.generatedDocs }, { onConflict: 'userid' });
+          .upsert({ userid: userId, doccount: this.generatedDocs }, { onConflict: 'userid' });
       } catch (e) { }
     }
   }

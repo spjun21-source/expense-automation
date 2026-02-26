@@ -86,7 +86,7 @@ class TutorialEngine {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_progress', filter: `userid=eq.${this.userId.toLowerCase()}` }, async payload => {
         console.log('🔄 Tutorial Progress Sync Received:', payload);
         if (payload.new) {
-          this.progress = payload.new.tutorialProgress;
+          this.progress = payload.new.tutorialprogress;
           this.renderWorkflow(this.container);
           if (this.currentScenario) this.renderSimulation(document.getElementById('panelPractice'));
           if (window.app) window.app.updateStats();
@@ -100,11 +100,11 @@ class TutorialEngine {
       try {
         const { data, error } = await this.supabase
           .from('user_progress')
-          .select('tutorialProgress')
+          .select('tutorialprogress')
           .eq('userid', this.userId.toLowerCase())
           .single();
         if (!error && data) {
-          this.progress = data.tutorialProgress;
+          this.progress = data.tutorialprogress;
           return;
         }
       } catch (e) { }
@@ -127,7 +127,7 @@ class TutorialEngine {
             .from('user_progress')
             .upsert({
               userid: this.userId.toLowerCase(),
-              tutorialProgress: this.progress,
+              tutorialprogress: this.progress,
               updatedat: new Date().toISOString()
             }, { onConflict: 'userid' });
         } catch (e) { }
