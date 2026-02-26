@@ -44,9 +44,10 @@ class TaskManager {
     async _load(date) {
         if (this.supabase) {
             try {
+                const targetDate = date || this.currentDate;
                 const { data, error } = await this._withTimeout(
                     this.supabase.from('tasks').select('*')
-                        .eq('date', date || this.currentDate)
+                        .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.완료)`)
                         .order('createdat', { ascending: true }),
                     1500, 'Tasks Load'
                 );
@@ -140,9 +141,10 @@ class TaskManager {
     async _loadComments(date) {
         if (this.supabase) {
             try {
+                const targetDate = date || this.currentDate;
                 const { data, error } = await this._withTimeout(
                     this.supabase.from('task_comments').select('*')
-                        .eq('date', date || this.currentDate)
+                        .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.completed)`)
                         .order('updatedat', { ascending: true }),
                     1500, 'Comments Load'
                 );
@@ -251,11 +253,16 @@ class TaskManager {
     async getTasks() {
         const allTasks = await this._load(this.currentDate);
         this.syncStatus = 'SYNCED';
-        if (this.isAdmin && this.filterUserId !== '전체') {
-            const lowerFilterId = this.filterUserId.toLowerCase();
-            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
+        if (this.isAdmin) {
+            if (this.filterUserId !== '전체') {
+                const lowerFilterId = this.filterUserId.toLowerCase();
+                return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
+            }
+            return allTasks;
+        } else {
+            const lowerCurrentId = this.userid.toLowerCase();
+            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerCurrentId);
         }
-        return allTasks;
     }
 
     async addTask(text, workflowId = '') {
@@ -325,8 +332,14 @@ class TaskManager {
         const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
         task.status = cycle[task.status] || '대기';
 
+        let updates = { status: task.status };
+        if (task.date < this.currentDate) {
+            task.date = this.currentDate;
+            updates.date = this.currentDate;
+        }
+
         if (this.supabase) {
-            await this.supabase.from('tasks').update({ status: task.status }).eq('id', taskId);
+            await this.supabase.from('tasks').update(updates).eq('id', taskId);
         } else {
             await this._save(tasks, this.currentDate);
         }
@@ -503,11 +516,20 @@ class TaskManager {
 
     async toggleCommentStatus(cmtId, currentStatus) {
         const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+
+        let targetComment = null;
         if (this.supabase) {
             try {
-                await this.supabase.from('task_comments').update({ status: newStatus }).eq('id', cmtId);
+                // Fetch the comment to check its date
+                const { data } = await this.supabase.from('task_comments').select('*').eq('id', cmtId).single();
+                let updates = { status: newStatus };
+                if (data && data.date < this.currentDate) {
+                    updates.date = this.currentDate;
+                }
+                await this.supabase.from('task_comments').update(updates).eq('id', cmtId);
             } catch (e) { console.error(e); }
         }
+
         // Local Sync
         const local = JSON.parse(localStorage.getItem(this._commentKey()) || '[]');
         const idx = local.findIndex(c => c.id === cmtId);
