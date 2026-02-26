@@ -25,7 +25,7 @@ class FormManager {
         const { data, error } = await supabase
           .from('user_progress')
           .select('docCount')
-          .eq('userId', userId)
+          .eq('userid', userId)
           .single();
         if (!error && data) {
           this.generatedDocs = data.docCount || 0;
@@ -42,7 +42,7 @@ class FormManager {
       try {
         await supabase
           .from('user_progress')
-          .upsert({ userId, docCount: this.generatedDocs }, { onConflict: 'userId' });
+          .upsert({ userid: userId, docCount: this.generatedDocs }, { onConflict: 'userid' });
       } catch (e) { }
     }
   }

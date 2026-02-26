@@ -1,4 +1,4 @@
-const APP_VERSION = 'v5.2.33';
+const APP_VERSION = 'v5.2.34';
 
 console.log('📦 [app.js] Module load start (v5.2.33)');
 
@@ -218,11 +218,11 @@ class App {
                 this.auth.bootstrapReady,
                 this.store.ready,
                 this.tutorial.loadProgress() // Load tutorial progress early
-            ]), 5000, 'Cloud Initialization');
+            ]), 7000, 'Cloud Initialization');
 
-            // 2. Fetch Users (max 2s)
+            // 2. Fetch Users (max 5s)
             console.log('🔄 Init Phase 2: User Fetch');
-            const users = await withTimeout(this.auth.getUsers(), 2000, 'User Fetch');
+            const users = await withTimeout(this.auth.getUsers(), 5000, 'User Fetch');
 
             console.log('🔄 Init Phase 3: TaskManager Setup');
             const sortedUserIds = users.map(u => u.id).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
