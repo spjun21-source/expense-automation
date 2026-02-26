@@ -1,13 +1,13 @@
-const APP_VERSION = 'v5.2.36';
+const APP_VERSION = 'v5.2.37';
 
-console.log('📦 [app.js] Module load start (v5.2.33)');
+console.log('📦 [app.js] Module load start (v5.2.37)');
 
-import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
-import { TutorialEngine } from './tutorial.js';
-import { FormManager } from './forms.js';
-import { AuthManager } from './auth.js';
-import { DocumentStore } from './store.js';
-import { TaskManager } from './tasks.js';
+import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.37';
+import { TutorialEngine } from './tutorial.js?v=5.2.37';
+import { FormManager } from './forms.js?v=5.2.37';
+import { AuthManager } from './auth.js?v=5.2.37';
+import { DocumentStore } from './store.js?v=5.2.37';
+import { TaskManager } from './tasks.js?v=5.2.37';
 import { ApprovalManager } from './approval.js';
 
 // Production Ready
