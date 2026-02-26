@@ -56,7 +56,7 @@ class TaskManager {
                     id: row.id,
                     text: row.text,
                     status: row.status,
-                    userid: row.userid || row.userId,
+                    userid: (row.userid || row.userId || '').toLowerCase(),
                     workflowid: row.workflowid || row.workflowId,
                     memo: row.memo,
                     createdat: row.createdat || row.createdAt,
@@ -109,9 +109,9 @@ class TaskManager {
             id: 'cmt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
             date: date || this.currentDate,
             content: comment.trim(),
-            userId: this.userid, // v5.2.29: Standardized case
-            status: 'pending', // v5.2.31: Add status
-            updatedAt: new Date().toISOString()
+            userid: this.userid.toLowerCase(),
+            status: 'pending',
+            updatedat: new Date().toISOString()
         };
 
         // Local cache (v5.2.29: Array-based storage)
@@ -143,14 +143,15 @@ class TaskManager {
                 const { data, error } = await this._withTimeout(
                     this.supabase.from('task_comments').select('*')
                         .eq('date', date || this.currentDate)
-                        .order('updatedAt', { ascending: true }),
+                        .order('updatedat', { ascending: true }),
                     1500, 'Comments Load'
                 );
                 if (!error && data) {
                     return data.map(row => ({
                         ...row,
-                        userId: row.userId || row.userid,
-                        status: row.status || 'pending'
+                        userid: (row.userid || row.userId || '').toLowerCase(),
+                        status: row.status || 'pending',
+                        updatedat: row.updatedat || row.updatedAt
                     }));
                 }
             } catch (e) {
@@ -251,7 +252,8 @@ class TaskManager {
         const allTasks = await this._load(this.currentDate);
         this.syncStatus = 'SYNCED';
         if (this.isAdmin && this.filterUserId !== '전체') {
-            return allTasks.filter(t => t.userid === this.filterUserId);
+            const lowerFilterId = this.filterUserId.toLowerCase();
+            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
         }
         return allTasks;
     }
@@ -269,7 +271,7 @@ class TaskManager {
                 year: 'numeric', month: '2-digit', day: '2-digit',
                 hour: '2-digit', minute: '2-digit'
             }),
-            userid: this.userid,
+            userid: this.userid.toLowerCase(),
             workflowid: workflowId,
             date: this.currentDate
         };
@@ -312,7 +314,10 @@ class TaskManager {
         if (!task) return null;
 
         // Permission check: Owner or Admin
-        if (task.userid !== this.userid && !this.isAdmin) {
+        const lowerTaskUserId = (task.userid || '').toLowerCase();
+        const lowerCurrentUserId = this.userid.toLowerCase();
+
+        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
             return null;
         }
@@ -334,7 +339,10 @@ class TaskManager {
         if (!task) return null;
 
         // Permission check: Owner or Admin
-        if (task.userid !== this.userid && !this.isAdmin) {
+        const lowerTaskUserId = (task.userid || '').toLowerCase();
+        const lowerCurrentUserId = this.userid.toLowerCase();
+
+        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
             return null;
         }
@@ -355,7 +363,10 @@ class TaskManager {
         if (!task) return;
 
         // Permission check: Owner or Admin
-        if (task.userid !== this.userid && !this.isAdmin) {
+        const lowerTaskUserId = (task.userid || '').toLowerCase();
+        const lowerCurrentUserId = this.userid.toLowerCase();
+
+        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
             window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
             return;
         }
@@ -394,7 +405,8 @@ class TaskManager {
         const allTasks = await this._load(this.currentDate);
 
         this.allUserIds.forEach(uid => {
-            const userTasks = allTasks.filter(t => t.userid === uid);
+            const lowerUid = uid.toLowerCase();
+            const userTasks = allTasks.filter(t => (t.userid || '').toLowerCase() === lowerUid);
             result[uid] = this.getStatsByData(userTasks);
         });
         return result;
@@ -437,14 +449,14 @@ class TaskManager {
                     <div class="comment-body">
                         <div class="comment-text">${c.content}</div>
                         <div class="comment-meta">
-                            👤 ${this.userMap[c.userId] || c.userId} | ${new Date(c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                            👤 ${this.userMap[c.userid] || c.userid} | ${new Date(c.updatedat || c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     </div>
                     <div class="comment-actions">
                         <button class="btn-icon c-status-toggle" data-cmt-id="${c.id}" data-status="${c.status || 'pending'}" title="${c.status === 'completed' ? '대기상태로 변경' : '완료처리'}">
                             ${c.status === 'completed' ? '✅' : '⏳'}
                         </button>
-                        ${this.isAdmin || c.userId === this.userid ? `
+                        ${this.isAdmin || (c.userid || '').toLowerCase() === this.userid.toLowerCase() ? `
                             <button class="btn-icon c-delete-btn" data-cmt-id="${c.id}" title="삭제">🗑️</button>
                         ` : ''}
                     </div>
@@ -523,7 +535,9 @@ class TaskManager {
     _renderTask(task, editable) {
         const statusIcons = { '대기': '⬜', '진행': '🔄', '완료': '✅' };
         const statusClass = { '대기': 'waiting', '진행': 'progress', '완료': 'done' };
-        const isOwn = task.userid === this.userid;
+        const lowerTaskUserId = (task.userid || '').toLowerCase();
+        const lowerCurrentUserId = this.userid.toLowerCase();
+        const isOwn = lowerTaskUserId === lowerCurrentUserId;
         const canEdit = editable && (isOwn || this.isAdmin);
         const hasMemo = task.memo && task.memo.trim();
         const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
@@ -535,7 +549,7 @@ class TaskManager {
         </button>
         <div class="task-main-content">
           <div class="task-meta-top">
-            <span class="task-author-badge ${isOwn ? 'own' : ''}">${this.userMap[task.userid] || task.userid}</span>
+            <span class="task-author-badge ${isOwn ? 'own' : ''}">${this.userMap[lowerTaskUserId] || lowerTaskUserId}</span>
             ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
             <span class="task-full-time" title="생성 일시">${task.createdatfull || task.createdat}</span>
           </div>

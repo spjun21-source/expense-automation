@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.32';
+const APP_VERSION = 'v5.2.33';
 
-console.log('📦 [app.js] Module load start (v5.2.32)');
+console.log('📦 [app.js] Module load start (v5.2.33)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js';
 import { TutorialEngine } from './tutorial.js';
@@ -227,7 +227,7 @@ class App {
             console.log('🔄 Init Phase 3: TaskManager Setup');
             const sortedUserIds = users.map(u => u.id).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
             const userMap = {};
-            users.forEach(u => userMap[u.id] = u.name);
+            users.forEach(u => userMap[u.id.toLowerCase()] = u.name);
 
             this.taskMgr = new TaskManager(user.id, {
                 isAdmin: this.auth.isAdmin(),
