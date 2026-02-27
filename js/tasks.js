@@ -228,7 +228,8 @@ class TaskManager {
                 console.log('📡 [Realtime Payload Check]:', payload);
                 const newData = payload.new;
                 if (newData && newData.date === this.currentDate) {
-                    window.app?.showToast(`🔄 [${newData.userid || newData.userId}] 팀 업무 실시간 업데이트`, 'info');
+                    const taskUserId = (newData.userid || newData.userId || '').toLowerCase();
+                    window.app?.showToast(`🔄 [${taskUserId}] 팀 업무 실시간 업데이트`, 'info');
                     if (this.container) this.render(this.container);
                 } else {
                     console.log('🔈 [Realtime] Item for different date ignored.');
@@ -253,16 +254,11 @@ class TaskManager {
     async getTasks() {
         const allTasks = await this._load(this.currentDate);
         this.syncStatus = 'SYNCED';
-        if (this.isAdmin) {
-            if (this.filterUserId !== '전체') {
-                const lowerFilterId = this.filterUserId.toLowerCase();
-                return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
-            }
-            return allTasks;
-        } else {
-            const lowerCurrentId = this.userid.toLowerCase();
-            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerCurrentId);
+        if (this.filterUserId !== '전체') {
+            const lowerFilterId = this.filterUserId.toLowerCase();
+            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
         }
+        return allTasks;
     }
 
     async addTask(text, workflowId = '') {
@@ -320,15 +316,6 @@ class TaskManager {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
 
-        // Permission check: Owner or Admin
-        const lowerTaskUserId = (task.userid || '').toLowerCase();
-        const lowerCurrentUserId = this.userid.toLowerCase();
-
-        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무만 변경할 수 있습니다.', 'error');
-            return null;
-        }
-
         const cycle = { '대기': '진행', '진행': '완료', '완료': '대기' };
         task.status = cycle[task.status] || '대기';
 
@@ -351,15 +338,6 @@ class TaskManager {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return null;
 
-        // Permission check: Owner or Admin
-        const lowerTaskUserId = (task.userid || '').toLowerCase();
-        const lowerCurrentUserId = this.userid.toLowerCase();
-
-        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무 비고만 수정할 수 있습니다.', 'error');
-            return null;
-        }
-
         task.memo = memo;
         if (this.supabase) {
             await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
@@ -374,15 +352,6 @@ class TaskManager {
         const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
-
-        // Permission check: Owner or Admin
-        const lowerTaskUserId = (task.userid || '').toLowerCase();
-        const lowerCurrentUserId = this.userid.toLowerCase();
-
-        if (lowerTaskUserId !== lowerCurrentUserId && !this.isAdmin) {
-            window.app?.showToast('⛔ 본인의 업무만 삭제할 수 있습니다.', 'error');
-            return;
-        }
 
         if (this.supabase) {
             await this.supabase.from('tasks').delete().eq('id', taskId);
@@ -442,14 +411,14 @@ class TaskManager {
         const dailyComments = await this._loadComments(this.currentDate);
 
         // 상단 사용자 필터 칩 구성 (v5.2.29)
-        const userChipsHtml = this.isAdmin ? `
+        const userChipsHtml = `
             <div class="user-filter-chips">
                 <div class="user-chip ${!this.filterUserId || this.filterUserId === '전체' ? 'active' : ''}" data-filter-uid="전체">전체보기</div>
                 ${this.allUserIds.map(uid => `
                     <div class="user-chip ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">${this.userMap[uid] || uid}</div>
                 `).join('')}
             </div>
-        ` : '';
+        `;
 
         // ... header and stats 
 
@@ -469,9 +438,7 @@ class TaskManager {
                         <button class="btn-icon c-status-toggle" data-cmt-id="${c.id}" data-status="${c.status || 'pending'}" title="${c.status === 'completed' ? '대기상태로 변경' : '완료처리'}">
                             ${c.status === 'completed' ? '✅' : '⏳'}
                         </button>
-                        ${this.isAdmin || (c.userid || '').toLowerCase() === this.userid.toLowerCase() ? `
-                            <button class="btn-icon c-delete-btn" data-cmt-id="${c.id}" title="삭제">🗑️</button>
-                        ` : ''}
+                        <button class="btn-icon c-delete-btn" data-cmt-id="${c.id}" title="삭제">🗑️</button>
                     </div>
                 </div>
             `).join('');
@@ -480,7 +447,7 @@ class TaskManager {
           <div class="tasks-widget">
             <!-- Header, UserChips, Input logic exactly as before but UI is adjusted for Sidebar -->
             <div class="tasks-header">
-                <h3 class="tasks-title">📌 ${this.isAdmin ? '팀 업무 대시보드' : '오늘의 업무 현황'}</h3>
+                <h3 class="tasks-title">📌 팀 업무 대시보드</h3>
                 <div class="tasks-date-nav">
                     <button class="tasks-nav-btn" id="taskPrevDate">◀</button>
                     <span class="tasks-date">${dateDisplay}</span>
@@ -498,10 +465,10 @@ class TaskManager {
 
             <div class="tasks-comment-area v5-2-31">
                 <div class="comment-header">
-                    <span class="comment-title">📝 ${this.isAdmin ? '관리자 지시사항' : '팀 비망록'}</span>
+                    <span class="comment-title">📝 팀 비망록 / 지시사항</span>
                 </div>
                 <div class="comment-input-row">
-                    <input type="text" id="dailyCommentInput" placeholder="${this.isAdmin ? '지시사항을 입력하세요...' : '비망록을 입력하세요...'}" maxlength="500">
+                    <input type="text" id="dailyCommentInput" placeholder="비망록이나 지시사항을 입력하세요..." maxlength="500">
                     <button class="btn btn-sm btn-primary" id="btnSaveComment">등록</button>
                 </div>
                 <div class="comments-timeline">
@@ -560,7 +527,7 @@ class TaskManager {
         const lowerTaskUserId = (task.userid || '').toLowerCase();
         const lowerCurrentUserId = this.userid.toLowerCase();
         const isOwn = lowerTaskUserId === lowerCurrentUserId;
-        const canEdit = editable && (isOwn || this.isAdmin);
+        const canEdit = editable;
         const hasMemo = task.memo && task.memo.trim();
         const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
 
