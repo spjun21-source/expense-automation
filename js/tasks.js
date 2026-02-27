@@ -49,7 +49,7 @@ class TaskManager {
                     this.supabase.from('tasks').select('*')
                         .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.완료)`)
                         .order('createdat', { ascending: true }),
-                    1500, 'Tasks Load'
+                    5000, 'Tasks Load'
                 );
                 if (error) throw error;
                 // v5.2.14: Data Normalization (DB 대소문자 차이 극복)
@@ -128,6 +128,8 @@ class TaskManager {
                 if (error) {
                     console.error('Comment Sync Error:', error);
                     window.app?.showToast('⚠️ 비고 동기화 실패', 'error');
+                } else {
+                    this.channel?.send({ type: 'broadcast', event: 'sync-comments', payload: {} }).catch(() => { });
                 }
             } catch (e) {
                 console.error(e);
@@ -146,7 +148,7 @@ class TaskManager {
                     this.supabase.from('task_comments').select('*')
                         .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.completed)`)
                         .order('updatedat', { ascending: true }),
-                    1500, 'Comments Load'
+                    5000, 'Comments Load'
                 );
                 if (!error && data) {
                     return data.map(row => ({
@@ -237,6 +239,10 @@ class TaskManager {
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
                 console.log('📡 [Realtime] Comments Updated:', payload);
+                if (this.container) this.render(this.container);
+            })
+            .on('broadcast', { event: 'sync-comments' }, payload => {
+                console.log('📡 [Broadcast] Comments sync forced:', payload);
                 if (this.container) this.render(this.container);
             })
             .subscribe((status) => {
@@ -493,7 +499,8 @@ class TaskManager {
                 if (data && data.date < this.currentDate) {
                     updates.date = this.currentDate;
                 }
-                await this.supabase.from('task_comments').update(updates).eq('id', cmtId);
+                const { error } = await this.supabase.from('task_comments').update(updates).eq('id', cmtId);
+                if (!error) this.channel?.send({ type: 'broadcast', event: 'sync-comments', payload: {} }).catch(() => { });
             } catch (e) { console.error(e); }
         }
 
@@ -511,7 +518,8 @@ class TaskManager {
         if (!confirm('지시사항을 삭제하시겠습니까?')) return;
         if (this.supabase) {
             try {
-                await this.supabase.from('task_comments').delete().eq('id', cmtId);
+                const { error } = await this.supabase.from('task_comments').delete().eq('id', cmtId);
+                if (!error) this.channel?.send({ type: 'broadcast', event: 'sync-comments', payload: {} }).catch(() => { });
             } catch (e) { console.error(e); }
         }
         // Local Sync
