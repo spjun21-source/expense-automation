@@ -3213,31 +3213,29 @@ body {
 }
 
 .task-delete-btn {
-
   background: none;
-
   border: none;
-
   cursor: pointer;
-
   font-size: 0.85rem;
-
-  opacity: 0;
-
+  opacity: 0.4;
   transition: var(--transition);
-
 }
-
 .task-item:hover .task-delete-btn {
-
-  opacity: 0.6;
-
+  opacity: 0.8;
+}
+.task-delete-btn:hover {
+  opacity: 1 !important;
+  color: var(--error);
+  transform: scale(1.1);
 }
 
-.task-delete-btn:hover {
-
-  opacity: 1 !important;
-
+.task-author-badge.badge-eunji {
+  background: rgba(16, 185, 129, 0.15); /* Greenish */
+  color: #10b981;
+}
+.task-author-badge.badge-seonyoung {
+  background: rgba(168, 85, 247, 0.15); /* Purpleish */
+  color: #a855f7;
 }
 
 /* --- My Documents --- */

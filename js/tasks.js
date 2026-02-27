@@ -571,6 +571,12 @@ class TaskManager {
         const hasMemo = task.memo && task.memo.trim();
         const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
 
+        let badgeClass = '';
+        if (isOwn) badgeClass += ' own';
+        const userName = this.userMap[lowerTaskUserId] || lowerTaskUserId;
+        if (userName === '이은지') badgeClass += ' badge-eunji';
+        if (userName === '박선영') badgeClass += ' badge-seonyoung';
+
         return `
       <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userid}">
         <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userid}" title="상태 변경">
@@ -578,7 +584,7 @@ class TaskManager {
         </button>
         <div class="task-main-content">
           <div class="task-meta-top">
-            <span class="task-author-badge ${isOwn ? 'own' : ''}">${this.userMap[lowerTaskUserId] || lowerTaskUserId}</span>
+            <span class="task-author-badge ${badgeClass.trim()}">${userName}</span>
             ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
             <span class="task-full-time" title="생성 일시">${task.createdatfull || task.createdat}</span>
           </div>
