@@ -482,6 +482,7 @@ class TaskManager {
                 <h3 class="tasks-title">📌 일정 캘린더</h3>
                 <div class="tasks-date-nav">
                     <button class="btn btn-xs btn-outline" id="calToggleList">📋 목록보기</button>
+                    <button class="btn btn-xs btn-outline" id="calToggleWeekly">📅 주간보기</button>
                     <button class="tasks-nav-btn" id="calPrevMonth">◀</button>
                     <span class="tasks-date" style="font-weight:bold;">${y}년 ${m + 1}월</span>
                     <button class="tasks-nav-btn" id="calNextMonth">▶</button>
@@ -560,6 +561,10 @@ class TaskManager {
             this.viewMode = 'list';
             this.render(container);
         });
+        container.querySelector('#calToggleWeekly')?.addEventListener('click', () => {
+            this.viewMode = 'weekly';
+            this.render(container);
+        });
         container.querySelector('#calPrevMonth')?.addEventListener('click', () => {
             this.calendarMonth.setMonth(this.calendarMonth.getMonth() - 1);
             this.renderCalendar(container);
@@ -590,6 +595,153 @@ class TaskManager {
     }
 
     // ============================================
+    // 주간 렌더링 및 엑셀 내보내기
+    // ============================================
+    async renderWeekly(container) {
+        if (!container) return;
+
+        // Calculate the current week's Monday and Sunday based on this.currentDate
+        const curr = new Date(this.currentDate);
+        const day = curr.getDay(); // 0 is Sunday, 1 is Monday
+        const diffToMonday = curr.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(curr.setDate(diffToMonday));
+
+        const weekDates = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            weekDates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        }
+
+        const startDateStr = weekDates[0];
+        const endDateStr = weekDates[6];
+
+        let weeklyTasks = [];
+        if (this.supabase) {
+            try {
+                const { data } = await this._withTimeout(
+                    this.supabase.from('tasks').select('*')
+                        .gte('date', startDateStr)
+                        .lte('date', endDateStr),
+                    5000, 'Weekly Tasks Load'
+                );
+                weeklyTasks = data || [];
+            } catch (e) { console.warn('Weekly tasks load failed', e); }
+        } else {
+            weekDates.forEach(dateStr => {
+                const dailyTasks = JSON.parse(localStorage.getItem(this._storageKey(dateStr)) || '[]');
+                weeklyTasks = weeklyTasks.concat(dailyTasks.map(t => ({ ...t, date: dateStr })));
+            });
+        }
+
+        // Generate weekly HTML
+        let html = `
+          <div class="tasks-widget">
+            <div class="tasks-header" style="flex-wrap: wrap; gap: 8px;">
+                <h3 class="tasks-title">📌 주간 업무 보고서</h3>
+                <div class="tasks-date-nav">
+                    <button class="btn btn-xs btn-outline" id="weekToggleList">📋 목록보기</button>
+                    <button class="btn btn-xs btn-outline" id="weekToggleCalendar">📅 달력보기</button>
+                    <button class="btn btn-xs btn-primary" id="weekExportExcel" style="margin-left: 8px;">📥 엑셀 다운로드</button>
+                </div>
+            </div>
+            <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid var(--border); font-weight: bold; text-align: center;">
+                ${startDateStr} ~ ${endDateStr} (월~일)
+            </div>
+            <div style="padding: 16px; overflow-y: auto; max-height: 500px;">
+        `;
+
+        if (weeklyTasks.length === 0) {
+            html += `<div style="text-align:center; padding:20px; color:var(--text-muted);">이번 주에 등록된 업무가 없습니다.</div>`;
+        } else {
+            const dateHeaders = ['월', '화', '수', '목', '금', '토', '일'];
+            weekDates.forEach((dateStr, idx) => {
+                const dayTasks = weeklyTasks.filter(t => t.date === dateStr);
+                if (dayTasks.length > 0) {
+                    html += `
+                        <div style="margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                            <div style="background: var(--surface); padding: 8px 12px; font-weight: bold; border-bottom: 1px solid var(--border);">
+                                ${dateStr} (${dateHeaders[idx]})
+                            </div>
+                            <div style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                ${dayTasks.map(t => {
+                        const userName = this.userMap[(t.userid || '').toLowerCase()] || t.userid;
+                        const statusIcon = t.status === '완료' ? '✅' : (t.status === '진행' ? '🔄' : '⬜');
+                        return `
+                                        <div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px; background: var(--bg-card-hover); border-radius: 4px;">
+                                            <span style="font-weight: bold; min-width: 60px; color: var(--primary);">${userName}</span>
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 500;">${t.text}</div>
+                                                ${t.memo ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">↳ 비고: ${t.memo}</div>` : ''}
+                                            </div>
+                                            <span style="font-size: 0.85rem; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.1);">${statusIcon} ${t.status}</span>
+                                        </div>
+                                    `;
+                    }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+
+        container.innerHTML = html;
+
+        container.querySelector('#weekToggleList')?.addEventListener('click', () => {
+            this.viewMode = 'list';
+            this.render(container);
+        });
+        container.querySelector('#weekToggleCalendar')?.addEventListener('click', () => {
+            this.viewMode = 'calendar';
+            this.render(container);
+        });
+        container.querySelector('#weekExportExcel')?.addEventListener('click', () => {
+            this.exportWeeklyToCSV(weeklyTasks, weekDates);
+        });
+    }
+
+    exportWeeklyToCSV(weeklyTasks, weekDates) {
+        // Required format: 'ER바이오코어 사업단' Header
+        // Columns: '담당자' / '업무 내용' / '비고' / '최종 Status' / '월-일-요일'
+
+        let csvContent = '\uFEFF'; // BOM for UTF-8 Excel support
+        csvContent += '"ER바이오코어 사업단 주간 업무 보고서"\n\n';
+        csvContent += '"담당자","업무 내용","비고","최종 Status","월-일-요일"\n';
+
+        const daysKor = ['일', '월', '화', '수', '목', '금', '토'];
+
+        // Sort tasks by date, then by user
+        const sortedTasks = [...weeklyTasks].sort((a, b) => {
+            return a.date.localeCompare(b.date) || (a.userid || '').localeCompare(b.userid || '');
+        });
+
+        sortedTasks.forEach(t => {
+            const userName = this.userMap[(t.userid || '').toLowerCase()] || t.userid;
+            const text = t.text ? t.text.replace(/"/g, '""') : '';
+            const memo = t.memo ? t.memo.replace(/"/g, '""') : '';
+
+            const d = new Date(t.date);
+            const dateStrFormatted = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${daysKor[d.getDay()]}`;
+
+            csvContent += `"${userName}","${text}","${memo}","${t.status}","${dateStrFormatted}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `주간업무보고서_${weekDates[0]}_${weekDates[6]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // ============================================
     // 대시보드 렌더링
     // ============================================
     async render(container) {
@@ -598,6 +750,9 @@ class TaskManager {
 
         if (this.viewMode === 'calendar') {
             return this.renderCalendar(container);
+        }
+        if (this.viewMode === 'weekly') {
+            return this.renderWeekly(container);
         }
 
         const isToday = this.isToday();
@@ -661,6 +816,7 @@ class TaskManager {
                 <h3 class="tasks-title">📌 팀 업무 대시보드</h3>
                 <div class="tasks-date-nav">
                     <button class="btn btn-xs btn-outline" id="taskToggleCalendar">📅 달력보기</button>
+                    <button class="btn btn-xs btn-outline" id="taskToggleWeekly">📅 주간보기</button>
                     <button class="tasks-nav-btn" id="taskPrevDate">◀</button>
                     <span class="tasks-date" style="cursor:pointer;" id="taskCurrentDateLabel" title="오늘로 이동">${dateDisplay}</span>
                     <button class="tasks-nav-btn" id="taskNextDate" ${isToday ? 'disabled' : ''}>▶</button>
@@ -914,10 +1070,14 @@ class TaskManager {
             });
         });
 
-        // 날짜 탐색 및 달력 전환
+        // 날짜 탐색 및 레이아웃 전환
         container.querySelector('#taskToggleCalendar')?.addEventListener('click', () => {
             this.viewMode = 'calendar';
             this.calendarMonth = new Date(this.currentDate);
+            this.render(container);
+        });
+        container.querySelector('#taskToggleWeekly')?.addEventListener('click', () => {
+            this.viewMode = 'weekly';
             this.render(container);
         });
         container.querySelector('#taskCurrentDateLabel')?.addEventListener('click', () => {
