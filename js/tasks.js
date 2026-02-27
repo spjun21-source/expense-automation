@@ -15,8 +15,9 @@ class TaskManager {
         this.supabase = initSupabase();
         this.container = null;
         this.syncStatus = 'IDLE';
-        this.viewMode = 'list'; // 'list' or 'calendar'
+        this.viewMode = 'list'; // 'list', 'calendar', 'weekly'
         this.calendarMonth = new Date(this.currentDate); // keeps track of the calendar's current month
+        this.weeklyGroupMode = 'byDate'; // 'byDate' or 'byUser'
         this._setupRealtime();
     }
 
@@ -523,24 +524,34 @@ class TaskManager {
                 borderColor = 'var(--text)';
             }
 
-            // Dots for tasks
-            let dotsHtml = '';
+            // Text titles for tasks
+            let tasksHtml = '';
             if (dayTasks.length > 0) {
-                const total = dayTasks.length;
-                const completed = dayTasks.filter(t => t.status === '완료').length;
-                const pending = total - completed;
+                const maxDisplay = 3;
+                const displayTasks = dayTasks.slice(0, maxDisplay);
+                const hiddenCount = dayTasks.length - maxDisplay;
 
-                dotsHtml = `<div style="display:flex; justify-content:center; gap:2px; margin-top:4px;">`;
-                for (let k = 0; k < Math.min(pending, 3); k++) dotsHtml += `<div style="width:6px; height:6px; border-radius:50%; background:var(--error);"></div>`;
-                for (let k = 0; k < Math.min(completed, 3); k++) dotsHtml += `<div style="width:6px; height:6px; border-radius:50%; background:var(--success);"></div>`;
-                if (total > 6) dotsHtml += `<div style="font-size:10px; line-height:6px; color:var(--text-muted);">+</div>`;
-                dotsHtml += `</div>`;
+                tasksHtml = `<div style="display:flex; flex-direction:column; gap:2px; margin-top:4px; text-align:left;">`;
+                displayTasks.forEach(t => {
+                    const statusColor = t.status === '완료' ? 'var(--success)' : 'var(--error)';
+                    const userName = this.userMap[(t.userid || '').toLowerCase()] || t.userid;
+                    tasksHtml += `
+                        <div style="font-size:0.7rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:rgba(0,0,0,0.05); padding:2px 4px; border-radius:4px; border-left: 2px solid ${statusColor};" title="${t.text}">
+                            <span style="font-weight:bold; color:var(--primary);">${userName?.substring(0, 2) || ''}</span> ${t.text}
+                        </div>
+                    `;
+                });
+
+                if (hiddenCount > 0) {
+                    tasksHtml += `<div style="font-size:0.65rem; color:var(--text-muted); text-align:center;">+${hiddenCount}개 더보기</div>`;
+                }
+                tasksHtml += `</div>`;
             }
 
             html += `
-                <div class="cal-day-cell" data-date="${dateStr}" style="padding:10px 4px; border-radius:8px; border:1px solid ${borderColor}; background:${bg}; text-align:center; cursor:pointer; transition:var(--transition); position:relative;">
-                    <span style="color:${dayColor}; font-size:0.9rem; font-weight:${isToday || isSelected ? 'bold' : 'normal'}">${i}</span>
-                    ${dotsHtml}
+                <div class="cal-day-cell" data-date="${dateStr}" style="padding:6px 4px; min-height:80px; border-radius:8px; border:1px solid ${borderColor}; background:${bg}; cursor:pointer; transition:var(--transition); position:relative;">
+                    <div style="text-align:center; color:${dayColor}; font-size:0.85rem; font-weight:${isToday || isSelected ? 'bold' : 'normal'}">${i}</div>
+                    ${tasksHtml}
                 </div>
             `;
         }
@@ -600,19 +611,47 @@ class TaskManager {
     async renderWeekly(container) {
         if (!container) return;
 
-        // Calculate the current week's Monday and Sunday based on this.currentDate
-        const curr = new Date(this.currentDate);
-        const day = curr.getDay(); // 0 is Sunday, 1 is Monday
-        const diffToMonday = curr.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(curr.setDate(diffToMonday));
+        // Compute weeks for the currently selected calendar month
+        const y = this.calendarMonth.getFullYear();
+        const m = this.calendarMonth.getMonth();
 
-        const weekDates = [];
-        for (let i = 0; i < 7; i++) {
-            const d = new Date(monday);
-            d.setDate(monday.getDate() + i);
-            weekDates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+        // Find the Monday of the first week that includes the 1st of the month
+        const firstOfMonth = new Date(y, m, 1);
+        const dayOfFirst = firstOfMonth.getDay(); // 0 for Sunday, 1 for Monday
+        // Adjust to find the Monday of the week containing the 1st.
+        // If 1st is Sunday (0), Monday is 6 days before. If 1st is Monday (1), Monday is 0 days before.
+        // If 1st is Tuesday (2), Monday is 1 day before.
+        const firstArrangementMonday = new Date(y, m, 1 - (dayOfFirst === 0 ? 6 : dayOfFirst - 1));
+
+        // Create an array of weeks for the month
+        const weeks = [];
+        let curMonday = new Date(firstArrangementMonday);
+        // Add weeks until the monday is in the next month
+        while (curMonday.getMonth() === m || (curMonday.getMonth() < m && weeks.length === 0)) {
+            const weekDates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(curMonday);
+                d.setDate(curMonday.getDate() + i);
+                weekDates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+            }
+            weeks.push(weekDates);
+            curMonday.setDate(curMonday.getDate() + 7);
         }
 
+        // Determine active week based on this.currentDate if inside this month, else default to week 1
+        let activeWeekIndex = 0;
+        for (let i = 0; i < weeks.length; i++) {
+            if (weeks[i].includes(this.currentDate)) {
+                activeWeekIndex = i;
+                break;
+            }
+        }
+        // If we previously navigated to a week that isn't the current date, we use this.weeklyActiveWeekIndex if set
+        if (this.weeklyActiveWeekIndex !== undefined && this.weeklyActiveWeekIndex < weeks.length) {
+            activeWeekIndex = this.weeklyActiveWeekIndex;
+        }
+
+        const weekDates = weeks[activeWeekIndex];
         const startDateStr = weekDates[0];
         const endDateStr = weekDates[6];
 
@@ -634,55 +673,98 @@ class TaskManager {
             });
         }
 
+        // Filter tasks if general filter active
+        if (this.filterUserId !== '전체') {
+            const lowerFilterId = this.filterUserId.toLowerCase();
+            weeklyTasks = weeklyTasks.filter(t => (t.userid || t.userId || '').toLowerCase() === lowerFilterId);
+        }
+
+        const isByDate = this.weeklyGroupMode === 'byDate';
+
+        // Week Tabs HTML
+        const weekTabsHtml = weeks.map((w, idx) => `
+            <button class="btn btn-xs ${idx === activeWeekIndex ? 'btn-primary' : 'btn-outline'} week-tab-btn" data-week-idx="${idx}">
+                ${idx + 1}주차
+            </button>
+        `).join('');
+
         // Generate weekly HTML
         let html = `
           <div class="tasks-widget">
             <div class="tasks-header" style="flex-wrap: wrap; gap: 8px;">
-                <h3 class="tasks-title">📌 주간 업무 보고서</h3>
+                <h3 class="tasks-title">📌 ${y}년 ${m + 1}월 주간 업무 보고서</h3>
                 <div class="tasks-date-nav">
                     <button class="btn btn-xs btn-outline" id="weekToggleList">📋 목록보기</button>
                     <button class="btn btn-xs btn-outline" id="weekToggleCalendar">📅 달력보기</button>
                     <button class="btn btn-xs btn-primary" id="weekExportExcel" style="margin-left: 8px;">📥 엑셀 다운로드</button>
                 </div>
             </div>
-            <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid var(--border); font-weight: bold; text-align: center;">
-                ${startDateStr} ~ ${endDateStr} (월~일)
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding: 12px 16px; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid var(--border);">
+                <div style="display:flex; gap:4px; align-items:center;">
+                    <button class="tasks-nav-btn" id="weekPrevMonth">◀</button>
+                    ${weekTabsHtml}
+                    <button class="tasks-nav-btn" id="weekNextMonth">▶</button>
+                </div>
+                <div style="font-weight: bold; font-size:0.9rem;">
+                    ${startDateStr} ~ ${endDateStr}
+                </div>
+                <div>
+                    <select id="weekGroupToggle" class="form-select" style="padding: 4px 24px 4px 8px; font-size:0.85rem; height:auto;">
+                        <option value="byDate" ${isByDate ? 'selected' : ''}>일자별 보기</option>
+                        <option value="byUser" ${!isByDate ? 'selected' : ''}>담당자별 보기</option>
+                    </select>
+                </div>
             </div>
+            
             <div style="padding: 16px; overflow-y: auto; max-height: 500px;">
         `;
+
+        const dateHeaders = ['일', '월', '화', '수', '목', '금', '토']; // Adjusted for getDay() output
 
         if (weeklyTasks.length === 0) {
             html += `<div style="text-align:center; padding:20px; color:var(--text-muted);">이번 주에 등록된 업무가 없습니다.</div>`;
         } else {
-            const dateHeaders = ['월', '화', '수', '목', '금', '토', '일'];
-            weekDates.forEach((dateStr, idx) => {
-                const dayTasks = weeklyTasks.filter(t => t.date === dateStr);
-                if (dayTasks.length > 0) {
+            if (isByDate) {
+                // Group By Date
+                weekDates.forEach((dateStr, idx) => {
+                    const dayTasks = weeklyTasks.filter(t => t.date === dateStr);
+                    if (dayTasks.length > 0) {
+                        html += `
+                            <div style="margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                                <div style="background: var(--surface); padding: 8px 12px; font-weight: bold; border-bottom: 1px solid var(--border);">
+                                    ${dateStr} (${dateHeaders[new Date(dateStr).getDay()]})
+                                </div>
+                                <div style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                    ${dayTasks.map(t => this._renderWeeklyTaskItem(t)).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                // Group By User
+                const users = [...new Set(weeklyTasks.map(t => (t.userid || '').toLowerCase()))];
+                users.forEach(uid => {
+                    const userTasks = weeklyTasks.filter(t => (t.userid || '').toLowerCase() === uid);
+                    const userName = this.userMap[uid] || uid;
+
                     html += `
                         <div style="margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
-                            <div style="background: var(--surface); padding: 8px 12px; font-weight: bold; border-bottom: 1px solid var(--border);">
-                                ${dateStr} (${dateHeaders[idx]})
+                            <div style="background: var(--surface); padding: 8px 12px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary);">
+                                👤 ${userName}
                             </div>
                             <div style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
-                                ${dayTasks.map(t => {
-                        const userName = this.userMap[(t.userid || '').toLowerCase()] || t.userid;
-                        const statusIcon = t.status === '완료' ? '✅' : (t.status === '진행' ? '🔄' : '⬜');
-                        return `
-                                        <div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px; background: var(--bg-card-hover); border-radius: 4px;">
-                                            <span style="font-weight: bold; min-width: 60px; color: var(--primary);">${userName}</span>
-                                            <div style="flex: 1;">
-                                                <div style="font-weight: 500;">${t.text}</div>
-                                                ${t.memo ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">↳ 비고: ${t.memo}</div>` : ''}
-                                            </div>
-                                            <span style="font-size: 0.85rem; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.1);">${statusIcon} ${t.status}</span>
-                                        </div>
-                                    `;
+                                ${userTasks.map(t => {
+                        const d = new Date(t.date);
+                        const dayName = dateHeaders[d.getDay()];
+                        return this._renderWeeklyTaskItem(t, `${t.date} (${dayName})`);
                     }).join('')}
                             </div>
                         </div>
                     `;
-                }
-            });
+                });
+            }
         }
 
         html += `
@@ -692,6 +774,7 @@ class TaskManager {
 
         container.innerHTML = html;
 
+        // Events
         container.querySelector('#weekToggleList')?.addEventListener('click', () => {
             this.viewMode = 'list';
             this.render(container);
@@ -703,6 +786,48 @@ class TaskManager {
         container.querySelector('#weekExportExcel')?.addEventListener('click', () => {
             this.exportWeeklyToCSV(weeklyTasks, weekDates);
         });
+        container.querySelector('#weekGroupToggle')?.addEventListener('change', (e) => {
+            this.weeklyGroupMode = e.target.value;
+            this.render(container);
+        });
+
+        container.querySelectorAll('.week-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.weeklyActiveWeekIndex = parseInt(btn.dataset.weekIdx, 10);
+                this.render(container);
+            });
+        });
+
+        container.querySelector('#weekPrevMonth')?.addEventListener('click', () => {
+            this.calendarMonth.setMonth(this.calendarMonth.getMonth() - 1);
+            this.weeklyActiveWeekIndex = 0; // reset to 1st week of new month
+            this.render(container);
+        });
+        container.querySelector('#weekNextMonth')?.addEventListener('click', () => {
+            this.calendarMonth.setMonth(this.calendarMonth.getMonth() + 1);
+            this.weeklyActiveWeekIndex = 0; // reset to 1st week of new month
+            this.render(container);
+        });
+    }
+
+    _renderWeeklyTaskItem(t, dateOverride = null) {
+        const userName = this.userMap[(t.userid || '').toLowerCase()] || t.userid;
+        const statusIcon = t.status === '완료' ? '✅' : (t.status === '진행' ? '🔄' : '⬜');
+
+        return `
+            <div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px; background: var(--bg-card-hover); border-radius: 4px;">
+                <span style="font-weight: bold; min-width: 80px; color: ${dateOverride ? 'var(--text-muted)' : 'var(--primary)'};">
+                    ${dateOverride || userName}
+                </span>
+                <div style="flex: 1;">
+                    <div style="font-weight: 500;">${t.text}</div>
+                    ${t.memo ? `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">↳ 비고: ${t.memo}</div>` : ''}
+                </div>
+                <span style="font-size: 0.85rem; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.1); white-space:nowrap;">
+                    ${statusIcon} ${t.status}
+                </span>
+            </div>
+        `;
     }
 
     exportWeeklyToCSV(weeklyTasks, weekDates) {
@@ -715,9 +840,13 @@ class TaskManager {
 
         const daysKor = ['일', '월', '화', '수', '목', '금', '토'];
 
-        // Sort tasks by date, then by user
+        // Sort tasks based on current group mode
         const sortedTasks = [...weeklyTasks].sort((a, b) => {
-            return a.date.localeCompare(b.date) || (a.userid || '').localeCompare(b.userid || '');
+            if (this.weeklyGroupMode === 'byDate') {
+                return a.date.localeCompare(b.date) || (a.userid || '').localeCompare(b.userid || '');
+            } else {
+                return (a.userid || '').localeCompare(b.userid || '') || a.date.localeCompare(b.date);
+            }
         });
 
         sortedTasks.forEach(t => {
