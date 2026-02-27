@@ -446,7 +446,7 @@ class TaskManager {
                 <div class="comment-item ${c.status === 'completed' ? 'completed' : ''}" data-cmt-id="${c.id}">
                     <div class="comment-seq">#${idx + 1}</div>
                     <div class="comment-body">
-                        <div class="comment-text">${c.content}</div>
+                        <div class="comment-text">${(c.content || '').replace(/\n/g, '<br>')}</div>
                         <div class="comment-meta">
                             👤 ${this.userMap[c.userid] || c.userid} | ${new Date(c.updatedat || c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -495,9 +495,9 @@ class TaskManager {
                 <div class="comment-header">
                     <span class="comment-title">📝 팀 비망록 / 지시사항</span>
                 </div>
-                <div class="comment-input-row">
-                    <input type="text" id="dailyCommentInput" placeholder="비망록이나 지시사항을 입력하세요..." maxlength="500">
-                    <button class="btn btn-sm btn-primary" id="btnSaveComment">등록</button>
+                <div class="comment-input-row" style="align-items: flex-start;">
+                    <textarea id="dailyCommentInput" class="form-input" style="flex:1; resize:vertical; min-height: 60px;" placeholder="비망록이나 지시사항을 입력하세요... (Enter: 등록, Shift+Enter: 줄바꿈)" maxlength="500"></textarea>
+                    <button class="btn btn-sm btn-primary" id="btnSaveComment" style="height: 60px;">등록</button>
                 </div>
                 <div class="comments-timeline">
                     ${commentsHtml}
@@ -572,10 +572,10 @@ class TaskManager {
         const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
 
         let badgeClass = '';
-        if (isOwn) badgeClass += ' own';
         const userName = this.userMap[lowerTaskUserId] || lowerTaskUserId;
-        if (userName === '이은지') badgeClass += ' badge-eunji';
-        if (userName === '박선영') badgeClass += ' badge-seonyoung';
+        if (userName === '이은지') badgeClass = ' badge-eunji';
+        else if (userName === '박선영') badgeClass = ' badge-seonyoung';
+        else if (isOwn) badgeClass = ' own';
 
         return `
       <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userid}">
@@ -597,7 +597,7 @@ class TaskManager {
         </button>
         ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userid}" title="삭제">🗑</button>` : ''}
       </div>
-      ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${task.memo}</div>` : ''}`;
+      ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${(task.memo || '').replace(/\n/g, '<br>')}</div>` : ''}`;
     }
 
     _bindEvents(container) {
@@ -672,7 +672,12 @@ class TaskManager {
                 }
             };
             saveCommentBtn.addEventListener('click', saveComment);
-            commentInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveComment(); });
+            commentInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveComment();
+                }
+            });
         }
 
         // 비망록 삭제 (Delegation)
@@ -736,7 +741,7 @@ class TaskManager {
         const editor = document.createElement('div');
         editor.className = 'task-memo-editor';
         editor.innerHTML = `
-      <input type="text" class="task-memo-input" value="${currentMemo}" placeholder="비고 내용을 입력하세요..." maxlength="200">
+      <textarea class="task-memo-input form-input" placeholder="비고 내용을 입력하세요... (Enter: 저장, Shift+Enter: 줄바꿈)" maxlength="200" style="width: 100%; resize: vertical; min-height: 60px; margin-bottom: 8px;">${currentMemo}</textarea>
       <div class="editor-actions">
         <button class="btn btn-xs btn-primary task-memo-save">저장</button>
         <button class="btn btn-xs btn-outline task-memo-cancel">취소</button>
@@ -756,7 +761,12 @@ class TaskManager {
         };
 
         editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
-        memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
+        memoInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                saveMemo();
+            }
+        });
         editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
     }
 }
