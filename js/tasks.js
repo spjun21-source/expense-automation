@@ -15,6 +15,8 @@ class TaskManager {
         this.supabase = initSupabase();
         this.container = null;
         this.syncStatus = 'IDLE';
+        this.viewMode = 'list'; // 'list' or 'calendar'
+        this.calendarMonth = new Date(this.currentDate); // keeps track of the calendar's current month
         this._setupRealtime();
     }
 
@@ -268,9 +270,10 @@ class TaskManager {
         return allTasks;
     }
 
-    async addTask(text, workflowId = '') {
+    async addTask(text, workflowId = '', customDate = null) {
         if (!text || !text.trim()) return null;
         const now = new Date();
+        const targetDate = customDate || this.currentDate;
         const task = {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
             text: text.trim(),
@@ -283,13 +286,13 @@ class TaskManager {
             }),
             userid: this.userid.toLowerCase(),
             workflowid: workflowId,
-            date: this.currentDate
+            date: targetDate
         };
 
         // 1. Local Cache Save
-        const tasks = await this._load(this.currentDate);
+        const tasks = await this._load(targetDate);
         tasks.push(task);
-        localStorage.setItem(this._storageKey(this.currentDate), JSON.stringify(tasks));
+        localStorage.setItem(this._storageKey(targetDate), JSON.stringify(tasks));
 
         // 2. Cloud Direct Insert (Trigger Real-time)
         if (this.supabase) {
@@ -421,17 +424,189 @@ class TaskManager {
     }
 
     // ============================================
+    // 달력 렌더링
+    // ============================================
+    async renderCalendar(container) {
+        if (!container) return;
+
+        const y = this.calendarMonth.getFullYear();
+        const m = this.calendarMonth.getMonth();
+        const firstDay = new Date(y, m, 1).getDay();
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+        // 달력의 시작일과 종료일 계산 (해당 월 전체 데이터를 가져오기 위함)
+        const startDateStr = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const endDateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+        // Get tasks for the whole month
+        let monthlyTasks = [];
+        if (this.supabase) {
+            try {
+                const { data } = await this._withTimeout(
+                    this.supabase.from('tasks').select('*')
+                        .gte('date', startDateStr)
+                        .lte('date', endDateStr),
+                    5000, 'Monthly Tasks Load'
+                );
+                monthlyTasks = data || [];
+            } catch (e) {
+                console.warn('Monthly tasks load failed', e);
+            }
+        } else {
+            // Local fallback: Check all storage keys for this month
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const dailyTasks = JSON.parse(localStorage.getItem(this._storageKey(dateStr)) || '[]');
+                monthlyTasks = monthlyTasks.concat(dailyTasks.map(t => ({ ...t, date: dateStr })));
+            }
+        }
+
+        // Filter tasks if general filter active
+        if (this.filterUserId !== '전체') {
+            const lowerFilterId = this.filterUserId.toLowerCase();
+            monthlyTasks = monthlyTasks.filter(t => (t.userid || t.userId || '').toLowerCase() === lowerFilterId);
+        }
+
+        // Group tasks by date
+        const tasksByDate = {};
+        monthlyTasks.forEach(t => {
+            const d = t.date;
+            if (!tasksByDate[d]) tasksByDate[d] = [];
+            tasksByDate[d].push(t);
+        });
+
+        // Generate calendar grid
+        let html = `
+          <div class="tasks-widget">
+            <div class="tasks-header">
+                <h3 class="tasks-title">📌 일정 캘린더</h3>
+                <div class="tasks-date-nav">
+                    <button class="btn btn-xs btn-outline" id="calToggleList">📋 목록보기</button>
+                    <button class="tasks-nav-btn" id="calPrevMonth">◀</button>
+                    <span class="tasks-date" style="font-weight:bold;">${y}년 ${m + 1}월</span>
+                    <button class="tasks-nav-btn" id="calNextMonth">▶</button>
+                    <button class="tasks-nav-btn" id="calToday" title="이번달로">📍</button>
+                </div>
+            </div>
+            <div style="padding: 16px;">
+                <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; text-align:center; font-weight:bold; margin-bottom:8px; color:var(--text-muted); font-size:0.85rem;">
+                    <div style="color:var(--error);">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div style="color:var(--primary);">토</div>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px;">
+        `;
+
+        // Empty cells before first day
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div style="padding:10px; border-radius:8px; border:1px solid transparent;"></div>`;
+        }
+
+        const todayStr = this._todayStr();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            const dayOfWeek = new Date(y, m, i).getDay();
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === this.currentDate;
+            const dayTasks = tasksByDate[dateStr] || [];
+
+            let dayColor = 'var(--text)';
+            if (dayOfWeek === 0) dayColor = 'var(--error)';
+            if (dayOfWeek === 6) dayColor = 'var(--primary)';
+
+            let bg = 'var(--bg-glass)';
+            let borderColor = 'var(--border)';
+            if (isToday) {
+                bg = 'rgba(59, 130, 246, 0.1)';
+                borderColor = 'var(--primary)';
+            } else if (isSelected) {
+                borderColor = 'var(--text)';
+            }
+
+            // Dots for tasks
+            let dotsHtml = '';
+            if (dayTasks.length > 0) {
+                const total = dayTasks.length;
+                const completed = dayTasks.filter(t => t.status === '완료').length;
+                const pending = total - completed;
+
+                dotsHtml = `<div style="display:flex; justify-content:center; gap:2px; margin-top:4px;">`;
+                for (let k = 0; k < Math.min(pending, 3); k++) dotsHtml += `<div style="width:6px; height:6px; border-radius:50%; background:var(--error);"></div>`;
+                for (let k = 0; k < Math.min(completed, 3); k++) dotsHtml += `<div style="width:6px; height:6px; border-radius:50%; background:var(--success);"></div>`;
+                if (total > 6) dotsHtml += `<div style="font-size:10px; line-height:6px; color:var(--text-muted);">+</div>`;
+                dotsHtml += `</div>`;
+            }
+
+            html += `
+                <div class="cal-day-cell" data-date="${dateStr}" style="padding:10px 4px; border-radius:8px; border:1px solid ${borderColor}; background:${bg}; text-align:center; cursor:pointer; transition:var(--transition); position:relative;">
+                    <span style="color:${dayColor}; font-size:0.9rem; font-weight:${isToday || isSelected ? 'bold' : 'normal'}">${i}</span>
+                    ${dotsHtml}
+                </div>
+            `;
+        }
+
+        html += `
+                </div>
+            </div>
+            <div style="padding: 12px 16px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); text-align: center;">
+                날짜를 클릭하면 해당 일자의 업무 목록으로 이동합니다.
+            </div>
+          </div>
+        `;
+
+        container.innerHTML = html;
+
+        // Calendar Events
+        container.querySelector('#calToggleList')?.addEventListener('click', () => {
+            this.viewMode = 'list';
+            this.render(container);
+        });
+        container.querySelector('#calPrevMonth')?.addEventListener('click', () => {
+            this.calendarMonth.setMonth(this.calendarMonth.getMonth() - 1);
+            this.renderCalendar(container);
+        });
+        container.querySelector('#calNextMonth')?.addEventListener('click', () => {
+            this.calendarMonth.setMonth(this.calendarMonth.getMonth() + 1);
+            this.renderCalendar(container);
+        });
+        container.querySelector('#calToday')?.addEventListener('click', () => {
+            this.calendarMonth = new Date(this._todayStr());
+            this.renderCalendar(container);
+        });
+
+        container.querySelectorAll('.cal-day-cell').forEach(cell => {
+            cell.addEventListener('click', () => {
+                this.currentDate = cell.dataset.date;
+                this.viewMode = 'list';
+                this.render(container);
+            });
+            cell.addEventListener('mouseover', () => { cell.style.borderColor = 'var(--primary)'; });
+            cell.addEventListener('mouseout', () => {
+                const dateStr = cell.dataset.date;
+                if (dateStr === this.currentDate) cell.style.borderColor = 'var(--text)';
+                else if (dateStr === this._todayStr()) cell.style.borderColor = 'var(--primary)';
+                else cell.style.borderColor = 'var(--border)';
+            });
+        });
+    }
+
+    // ============================================
     // 대시보드 렌더링
     // ============================================
     async render(container) {
         if (!container) return;
         this.container = container;
+
+        if (this.viewMode === 'calendar') {
+            return this.renderCalendar(container);
+        }
+
         const isToday = this.isToday();
         const dateDisplay = new Date(this.currentDate + 'T00:00:00').toLocaleDateString('ko-KR', {
             year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
         });
 
         const currentTaskInput = container.querySelector('#taskInput')?.value || '';
+        const currentTaskDate = container.querySelector('#taskDateInput')?.value || this.currentDate;
         const currentMemoInput = container.querySelector('#dailyCommentInput')?.value || '';
 
         // 데이터 로드
@@ -485,18 +660,20 @@ class TaskManager {
             <div class="tasks-header">
                 <h3 class="tasks-title">📌 팀 업무 대시보드</h3>
                 <div class="tasks-date-nav">
+                    <button class="btn btn-xs btn-outline" id="taskToggleCalendar">📅 달력보기</button>
                     <button class="tasks-nav-btn" id="taskPrevDate">◀</button>
-                    <span class="tasks-date">${dateDisplay}</span>
+                    <span class="tasks-date" style="cursor:pointer;" id="taskCurrentDateLabel" title="오늘로 이동">${dateDisplay}</span>
                     <button class="tasks-nav-btn" id="taskNextDate" ${isToday ? 'disabled' : ''}>▶</button>
-                    <button class="tasks-nav-btn" id="taskRefreshCloud">🔄</button>
+                    <button class="tasks-nav-btn" id="taskRefreshCloud" title="새로고침">🔄</button>
                 </div>
             </div>
 
             ${userChipsHtml}
 
             <!-- Task Input Bar -->
-            <div class="task-input-row" style="display: flex; gap: 8px; margin-bottom: 15px; background: var(--surface); padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                <input type="text" id="taskInput" class="form-input" placeholder="새로운 업무 내역을 입력하세요..." style="flex: 1;">
+            <div class="task-input-row" style="display: flex; gap: 8px; margin-bottom: 15px; background: var(--surface); padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap;">
+                <input type="date" id="taskDateInput" class="form-input" style="max-width: 140px;" value="${currentTaskDate}" title="업무 지정일">
+                <input type="text" id="taskInput" class="form-input" placeholder="새로운 업무 내역을 입력하세요..." style="flex: 1; min-width:200px;">
                 <select id="taskWorkflowLink" class="form-select" style="max-width: 140px;">
                     <option value="">(업무 단계)</option>
                     ${WORKFLOW_STEPS ? WORKFLOW_STEPS.map(s => `<option value="${s.id}">${s.title}</option>`).join('') : ''}
@@ -625,12 +802,13 @@ class TaskManager {
     _bindEvents(container) {
         // 업무 추가
         const input = container.querySelector('#taskInput');
+        const dateInput = container.querySelector('#taskDateInput');
         const workflowSelect = container.querySelector('#taskWorkflowLink');
         const addBtn = container.querySelector('#taskAddBtn');
         if (input && addBtn) {
             const addTask = async () => {
                 if (input.value.trim()) {
-                    await this.addTask(input.value, workflowSelect?.value || '');
+                    await this.addTask(input.value, workflowSelect?.value || '', dateInput?.value || this.currentDate);
                     // Clear input state strictly
                     input.value = '';
                     this.render(container);
@@ -736,7 +914,18 @@ class TaskManager {
             });
         });
 
-        // 날짜 탐색
+        // 날짜 탐색 및 달력 전환
+        container.querySelector('#taskToggleCalendar')?.addEventListener('click', () => {
+            this.viewMode = 'calendar';
+            this.calendarMonth = new Date(this.currentDate);
+            this.render(container);
+        });
+        container.querySelector('#taskCurrentDateLabel')?.addEventListener('click', () => {
+            if (this.currentDate !== this._todayStr()) {
+                this.currentDate = this._todayStr();
+                this.render(container);
+            }
+        });
         container.querySelector('#taskPrevDate')?.addEventListener('click', () => {
             this.prevDate();
             this.render(container);
