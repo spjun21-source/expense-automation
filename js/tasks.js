@@ -340,6 +340,25 @@ class TaskManager {
         return task;
     }
 
+    async updateTask(taskId, newText, newWorkflowId, targetUserId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        task.text = newText;
+        task.workflowid = newWorkflowId;
+
+        let updates = { text: newText, workflowid: newWorkflowId };
+
+        if (this.supabase) {
+            await this.supabase.from('tasks').update(updates).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
+        window.app?.showToast('✨ 업무가 수정되었습니다.', 'success');
+        return task;
+    }
+
     async updateMemo(taskId, memo, targetUserId) {
         const tasks = await this._load(this.currentDate);
         const task = tasks.find(t => t.id === taskId);
@@ -479,7 +498,7 @@ class TaskManager {
             <div class="task-input-row" style="display: flex; gap: 8px; margin-bottom: 15px; background: var(--surface); padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <input type="text" id="taskInput" class="form-input" placeholder="새로운 업무 내역을 입력하세요..." style="flex: 1;">
                 <select id="taskWorkflowLink" class="form-select" style="max-width: 140px;">
-                    <option value="">(일반 업무)</option>
+                    <option value="">(업무 단계)</option>
                     ${WORKFLOW_STEPS ? WORKFLOW_STEPS.map(s => `<option value="${s.id}">${s.title}</option>`).join('') : ''}
                 </select>
                 <button class="btn btn-primary" id="taskAddBtn">추가</button>
@@ -595,7 +614,10 @@ class TaskManager {
         <button class="task-memo-btn ${hasMemo ? 'has-memo' : ''}" data-action="memo" data-id="${task.id}" data-owner="${task.userid}" title="${hasMemo ? task.memo : '비고 추가'}">
           ${hasMemo ? '💬' : '📝'}
         </button>
-        ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userid}" title="삭제">🗑</button>` : ''}
+        ${canEdit ? `
+        <button class="task-edit-btn" data-action="edit" data-id="${task.id}" data-owner="${task.userid}" title="수정">✏️</button>
+        <button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userid}" title="삭제">🗑</button>
+        ` : ''}
       </div>
       ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${(task.memo || '').replace(/\n/g, '<br>')}</div>` : ''}`;
     }
@@ -648,6 +670,9 @@ class TaskManager {
 
                 if (action === 'cycle') {
                     this.cycleStatus(id, owner).then(() => this.render(container));
+                } else if (action === 'edit') {
+                    e.stopPropagation();
+                    this._showTaskEditor(container, id, owner);
                 } else if (action === 'delete') {
                     if (confirm('이 업무를 삭제하시겠습니까?')) {
                         this.deleteTask(id, owner).then(() => this.render(container));
@@ -768,6 +793,62 @@ class TaskManager {
             }
         });
         editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
+    }
+
+    async _showTaskEditor(container, taskId, ownerId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const existingEditor = container.querySelector('.task-content-editor');
+        if (existingEditor) existingEditor.remove();
+
+        const taskItem = container.querySelector(`[data-id="${taskId}"].task-item`);
+        if (!taskItem) return;
+
+        const editor = document.createElement('div');
+        editor.className = 'task-content-editor';
+        editor.style.cssText = 'padding: 10px; background: var(--bg-card-hover); border-radius: 6px; margin: 4px 0; display: flex; gap: 8px; align-items: center; border: 1px solid var(--primary);';
+
+        const wfOptions = `<option value="">(업무 단계)</option>` +
+            (WORKFLOW_STEPS || []).map(s => `<option value="${s.id}" ${s.id === task.workflowid ? 'selected' : ''}>${s.title}</option>`).join('');
+
+        editor.innerHTML = `
+      <input type="text" class="task-edit-text-input form-input" value="${task.text.replace(/"/g, '&quot;')}" placeholder="업무 내용 수정..." style="flex: 1;">
+      <select class="task-edit-wf-input form-select" style="max-width: 140px;">
+          ${wfOptions}
+      </select>
+      <div class="editor-actions" style="display: flex; gap: 4px;">
+        <button class="btn btn-xs btn-primary task-edit-save">저장</button>
+        <button class="btn btn-xs btn-outline task-edit-cancel">취소</button>
+      </div>
+    `;
+
+        taskItem.parentNode.insertBefore(editor, taskItem.nextSibling);
+        taskItem.style.display = 'none';
+
+        const textInput = editor.querySelector('.task-edit-text-input');
+        const wfInput = editor.querySelector('.task-edit-wf-input');
+        textInput.focus();
+
+        const closeEditor = () => {
+            taskItem.style.display = '';
+            editor.remove();
+        };
+
+        const saveTask = async () => {
+            if (!textInput.value.trim()) {
+                window.app?.showToast('업무 내용을 입력해주세요.', 'warning');
+                return;
+            }
+            await this.updateTask(taskId, textInput.value.trim(), wfInput.value, ownerId);
+            closeEditor();
+            this.render(container);
+        };
+
+        editor.querySelector('.task-edit-save').addEventListener('click', saveTask);
+        textInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveTask(); });
+        editor.querySelector('.task-edit-cancel').addEventListener('click', closeEditor);
     }
 }
 

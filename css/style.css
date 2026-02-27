@@ -200,13 +200,28 @@ body {
   align-items: center;
   gap: 10px;
 }
-.stat-card:hover { border-color: var(--primary); transform: translateY(-1px); }
 
-.stat-icon { font-size: 1.2rem; }
+.stat-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
 
-.stat-value { font-size: 1.1rem; font-weight: 700; color: var(--primary); font-family: \'JetBrains Mono\', monospace; }
+.stat-icon {
+  font-size: 1.2rem;
+}
 
-.stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0; }
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: \'JetBrains Mono\', monospace;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0;
+}
 
 /* --- Tab Navigation --- */
 
@@ -2890,7 +2905,8 @@ body {
 
 /* --- Dashboard Area with Tasks --- */
 
-.dashboard-area { max-width: 1400px;
+.dashboard-area {
+  max-width: 1400px;
   margin: 16px auto 32px;
   padding: 0 32px;
   display: flex;
@@ -3212,7 +3228,8 @@ body {
 
 }
 
-.task-delete-btn {
+.task-delete-btn,
+.task-edit-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -3220,21 +3237,33 @@ body {
   opacity: 0.4;
   transition: var(--transition);
 }
-.task-item:hover .task-delete-btn {
+
+.task-item:hover .task-delete-btn,
+.task-item:hover .task-edit-btn {
   opacity: 0.8;
 }
+
 .task-delete-btn:hover {
   opacity: 1 !important;
   color: var(--error);
   transform: scale(1.1);
 }
 
+.task-edit-btn:hover {
+  opacity: 1 !important;
+  color: var(--primary);
+  transform: scale(1.1);
+}
+
 .task-author-badge.badge-eunji {
-  background: rgba(16, 185, 129, 0.15); /* Greenish */
+  background: rgba(16, 185, 129, 0.15);
+  /* Greenish */
   color: #10b981;
 }
+
 .task-author-badge.badge-seonyoung {
-  background: rgba(168, 85, 247, 0.15); /* Purpleish */
+  background: rgba(168, 85, 247, 0.15);
+  /* Purpleish */
   color: #a855f7;
 }
 
@@ -5525,16 +5554,19 @@ body {
   padding: 10px;
   border-bottom: 1px solid var(--border);
 }
+
 /* v5.2.31: Comment Status & Action Styles */
 .comment-item.completed {
   opacity: 0.5;
   filter: grayscale(0.5);
   background: rgba(255, 255, 255, 0.02);
 }
+
 .comment-item.completed .comment-text {
   text-decoration: line-through;
   color: var(--text-dim);
 }
+
 .comment-item .btn-icon {
   background: none;
   border: none;
@@ -5544,10 +5576,12 @@ body {
   border-radius: 6px;
   transition: var(--transition);
 }
+
 .comment-item .btn-icon:hover {
   background: var(--bg-card-hover);
   transform: scale(1.1);
 }
+
 .comment-item .c-status-toggle {
-  filter: drop-shadow(0 0 4px rgba(255,255,255,0.1));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.1));
 }
