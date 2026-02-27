@@ -231,7 +231,8 @@ class TaskManager {
                 const newData = payload.new;
                 if (newData && newData.date === this.currentDate) {
                     const taskUserId = (newData.userid || newData.userId || '').toLowerCase();
-                    window.app?.showToast(`🔄 [${taskUserId}] 팀 업무 실시간 업데이트`, 'info');
+                    const userName = this.userMap[taskUserId] || taskUserId;
+                    window.app?.showToast(`🔄 [${userName}] 업무 내역/상태 업데이트`, 'info');
                     if (this.container) this.render(this.container);
                 } else {
                     console.log('🔈 [Realtime] Item for different date ignored.');
@@ -411,6 +412,9 @@ class TaskManager {
             year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
         });
 
+        const currentTaskInput = container.querySelector('#taskInput')?.value || '';
+        const currentMemoInput = container.querySelector('#dailyCommentInput')?.value || '';
+
         // 데이터 로드
         const tasks = await this.getTasks();
         const mainStats = this.getStatsByData(tasks);
@@ -427,6 +431,13 @@ class TaskManager {
         `;
 
         // ... header and stats 
+
+        // 상태에 따른 정렬: 완료된 것은 아래로
+        const sortedTasks = [...tasks].sort((a, b) => {
+            if (a.status === '완료' && b.status !== '완료') return 1;
+            if (a.status !== '완료' && b.status === '완료') return -1;
+            return (a.createdat || '').localeCompare(b.createdat || '');
+        });
 
         // 488: Traceable Timeline Rendering
         const commentsHtml = dailyComments.length === 0 ?
@@ -464,9 +475,20 @@ class TaskManager {
 
             ${userChipsHtml}
 
+            <!-- Task Input Bar -->
+            <div class="task-input-row" style="display: flex; gap: 8px; margin-bottom: 15px; background: var(--surface); padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <input type="text" id="taskInput" class="form-input" placeholder="새로운 업무 내역을 입력하세요..." style="flex: 1;">
+                <select id="taskWorkflowLink" class="form-select" style="max-width: 140px;">
+                    <option value="">(일반 업무)</option>
+                    ${WORKFLOW_STEPS ? WORKFLOW_STEPS.map(s => `<option value="${s.id}">${s.title}</option>`).join('') : ''}
+                </select>
+                <button class="btn btn-primary" id="taskAddBtn">추가</button>
+                <button class="btn btn-outline" id="taskClearCompleted" title="완료된 업무 모두 삭제">🗑 완료정리</button>
+            </div>
+
             <!-- Task List and Summary Sections... -->
-            <div class="tasks-list" id="tasksList">
-                ${tasks.length === 0 ? '<div class="tasks-empty">데이터가 없습니다.</div>' : tasks.map(t => this._renderTask(t, isToday)).join('')}
+            <div class="tasks-list" id="tasksList" style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                ${sortedTasks.length === 0 ? '<div class="tasks-empty">데이터가 없습니다.</div>' : sortedTasks.map(t => this._renderTask(t, isToday)).join('')}
             </div>
 
             <div class="tasks-comment-area v5-2-31">
@@ -483,6 +505,16 @@ class TaskManager {
             </div>
           </div>
         `;
+
+        // Restore input values if any
+        if (currentTaskInput) {
+            const tInput = container.querySelector('#taskInput');
+            if (tInput) { tInput.value = currentTaskInput; tInput.focus(); }
+        }
+        if (currentMemoInput) {
+            const mInput = container.querySelector('#dailyCommentInput');
+            if (mInput) { mInput.value = currentMemoInput; mInput.focus(); }
+        }
 
         this._bindEvents(container);
     }
@@ -571,11 +603,34 @@ class TaskManager {
             const addTask = async () => {
                 if (input.value.trim()) {
                     await this.addTask(input.value, workflowSelect?.value || '');
+                    // Clear input state strictly
+                    input.value = '';
                     this.render(container);
                 }
             };
             addBtn.addEventListener('click', addTask);
             input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+        }
+
+        const clearBtn = container.querySelector('#taskClearCompleted');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', async () => {
+                const tasks = await this._load(this.currentDate);
+                const completedIds = tasks.filter(t => t.status === '완료').map(t => t.id);
+                if (completedIds.length === 0) {
+                    return window.app?.showToast('🗑 정리할 완료된 업무가 없습니다.', 'info');
+                }
+                if (confirm(`완료된 업무 ${completedIds.length}건을 모두 삭제하시겠습니까?`)) {
+                    if (this.supabase) {
+                        await this.supabase.from('tasks').delete().in('id', completedIds);
+                    } else {
+                        const filtered = tasks.filter(t => t.status !== '완료');
+                        await this._save(filtered, this.currentDate);
+                    }
+                    window.app?.showToast('✨ 완료된 업무가 일괄 정리되었습니다.', 'success');
+                    this.render(container);
+                }
+            });
         }
 
         // 상태 변경, 삭제, 개별 메모
