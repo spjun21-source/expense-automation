@@ -1,4 +1,4 @@
-const APP_VERSION = 'v5.2.37';
+const APP_VERSION = 'v5.2.37 (CoreBot v1.2.0)';
 
 console.log('📦 [app.js] Module load start (v5.2.37)');
 
