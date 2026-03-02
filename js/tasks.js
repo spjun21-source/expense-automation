@@ -63,6 +63,7 @@ class TaskManager {
                     userid: (row.userid || row.userId || '').toLowerCase(),
                     workflowid: row.workflowid || row.workflowId,
                     memo: row.memo,
+                    category: row.category || '', // Added categorization
                     createdat: row.createdat || row.createdAt,
                     createdatfull: row.createdatfull || row.createdAtFull,
                     date: row.date
@@ -924,6 +925,9 @@ class TaskManager {
                 <div class="comment-item ${c.status === 'completed' ? 'completed' : ''}" data-cmt-id="${c.id}">
                     <div class="comment-seq">#${idx + 1}</div>
                     <div class="comment-body">
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">
+                            ${c.category ? `<span class="category-badge">${c.category}</span>` : ''}
+                        </div>
                         <div class="comment-text">${(c.content || '').replace(/\n/g, '<br>')}</div>
                         <div class="comment-meta">
                             👤 ${this.userMap[c.userid] || c.userid} | ${new Date(c.updatedat || c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -968,8 +972,8 @@ class TaskManager {
             </div>
 
             <!-- Task List and Summary Sections... -->
-            <div class="tasks-list" id="tasksList" style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
-                ${sortedTasks.length === 0 ? '<div class="tasks-empty">데이터가 없습니다.</div>' : sortedTasks.map(t => this._renderTask(t, isToday)).join('')}
+            <div class="tasks-list" id="tasksList" style="max-height: 450px; overflow-y: auto; padding-right: 5px;">
+                ${this._renderGroupedTasks(sortedTasks, isToday)}
             </div>
 
             <div class="tasks-comment-area v5-2-31">
@@ -1082,6 +1086,32 @@ class TaskManager {
         ` : ''}
       </div>
       ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">비고:</span> ${(task.memo || '').replace(/\n/g, '<br>')}</div>` : ''}`;
+    }
+
+    _renderGroupedTasks(tasks, editable) {
+        if (tasks.length === 0) return '<div class="tasks-empty">데이터가 없습니다.</div>';
+
+        const groups = {};
+        tasks.forEach(t => {
+            const cat = t.category || '일반';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(t);
+        });
+
+        const sortedCats = Object.keys(groups).sort((a, b) => {
+            if (a === '일반') return 1;
+            if (b === '일반') return -1;
+            return a.localeCompare(b);
+        });
+
+        return sortedCats.map(cat => `
+            <div class="task-group">
+                <div class="task-group-header">${cat}</div>
+                <div class="task-group-items">
+                    ${groups[cat].map(t => this._renderTask(t, editable)).join('')}
+                </div>
+            </div>
+        `).join('');
     }
 
     _bindEvents(container) {
