@@ -976,8 +976,35 @@ const SCENARIOS = [
             { step: 2, action: '베스트케어 분개수정 메뉴 접속', instruction: '베스트케어 시스템에 접속하여 분개수정 메뉴로 이동합니다.', hint: '🖥️ 베스트케어 > 결의관리 > 분개수정. 해당 결의번호를 검색하여 수정 대상을 선택합니다.' },
             { step: 3, action: '수정 내용 입력', instruction: '수정할 항목(계정과목, 금액, 적요 등)을 변경합니다.', checklist: ['수정 전 계정과목 확인', '수정 후 계정과목 선택', '금액 수정 (필요 시)', '적요 수정 (필요 시)', '수정 사유 기재'] },
             { step: 4, action: '수정 사유서 작성', instruction: '분개수정 사유서를 작성합니다. 수정 전/후 내용을 명확히 기재합니다.', hint: '수정 사유 예시: "비목 분류 오류로 인한 수정", "금액 입력 오류 정정" 등' },
-            { step: 5, action: '결재 요청', instruction: '분개수정 건을 결재선에 따라 승인 요청합니다.', hint: '분개수정은 기존 결의와 동일한 결재 라인을 따릅니다.' },
+            { step: 5, action: '전자결재', instruction: '연구비 종합관리시스템에서 전자결재를 진행합니다.', hint: '결재: 담당자 → 실장 승인' },
             { step: 6, action: '엑셀 반영', instruction: '지출내역 엑셀에서 해당 건의 수정 내용을 반영합니다.', hint: '비목, 세세목, 금액 등을 수정하고 비고란에 "분개수정"을 기재합니다.' }
+        ]
+    },
+    {
+        id: 'substitute_labor_pension',
+        title: '인건비 및 퇴직적립금 대체결의',
+        icon: '👤',
+        difficulty: '중급',
+        description: '매월 또는 매년 정기적으로 발생하는 인건비와 퇴직적립금을 다른 계좌로 이동(대체) 처리하는 시나리오',
+        budget: '12,500,000원',
+        category: '대체결의 > 인건비 / 퇴직적립금',
+        vendor: '자체 계좌이체',
+        excelSample: {
+            no: '', scheduledDate: '', transferDate: '', description: '인건비 대체 입금_12월분', amount: '12500000', actualAmount: '12500000',
+            fromBank: '기업은행', fromAccount: '55402028004050', payee: '55402028004050', toBank: '기업은행', toAccount: '55402030005080',
+            processType: '대체결의', fundSource: '국고', expenseCategory: '내부인건비', subCategory: '내부인건비',
+            evidenceDate: '', supplyAmount: '12500000', vatAmount: '0', status: '승인', vendor: '',
+            accountingDate: '', docNumber: '', resolutionNumber: ''
+        },
+        items: [
+            { name: '12월 참여연구원 인건비', qty: 1, unitPrice: 10000000 },
+            { name: '퇴직적립금 (10%)', qty: 1, unitPrice: 2500000 }
+        ],
+        steps: [
+            { step: 1, action: '집행 내역 확인', instruction: '인건비 지급 내역서와 퇴직적립금 산출 내역을 확인하세요.' },
+            { step: 2, action: '연구비 종합관리시스템 결의', instruction: '연구비 종합관리시스템에서 [징수결의] 또는 [일반대체] 청구서를 작성합니다.', hint: '인건비는 보통예금(11113)에서 당좌예금(11114)으로 이동합니다.' },
+            { step: 3, action: '베스트케어 대체결의서 작성', instruction: '베스트케어에서 수비/대체결의관리 메뉴를 통해 대체결의서를 작성하세요.', formType: 'substitute_resolution' },
+            { step: 4, action: '증빙 합본 및 제출', instruction: '연구비종합 결의서와 베스트케어 결의서를 묶어 재무팀에 제출합니다.', checklist: ['급여지급내역', '소득원천징수부', '대체결의서(2종)'] }
         ]
     }
 ];
@@ -1028,7 +1055,7 @@ const FORM_FIELDS = {
         fields: [
             { id: 'resDate', label: '결의일자', type: 'date', required: true },
             { id: 'resNo', label: '결의번호', type: 'text', required: true, placeholder: '예: 대체-2026-001' },
-            { id: 'accountTitle', label: '계정과목', type: 'select', required: true, options: ['내부인건비', '퇴직충당금', '이자수입'] },
+            { id: 'accountTitle', label: '계정과목', type: 'select', required: true, options: ['간접비 대체결의', '인건비 대체결의', '퇴직적립금 대체결의', '퇴직금 대체결의', '이자수입 대체결의', '이월금·국고재원 대체결의'] },
             { id: 'description', label: '적요', type: 'textarea', required: true },
             { id: 'debitAccount', label: '차변 계정', type: 'text', required: true },
             { id: 'creditAccount', label: '대변 계정', type: 'text', required: true },

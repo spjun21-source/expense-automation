@@ -245,7 +245,7 @@ class ApprovalManager {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline btn-modal-close">취소</button>
-          <button class="btn btn-primary" id="saveUserBtn">저정하기</button>
+          <button class="btn btn-primary" id="saveUserBtn">저장하기</button>
         </div>
       </div>
     `;

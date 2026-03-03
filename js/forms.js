@@ -90,7 +90,16 @@ class FormManager {
 
   bindFormEvents(container) {
     container.querySelectorAll('.form-input, .form-textarea, .form-select').forEach(el => {
-      const handler = (e) => { if (e.target.dataset.field) this.formData[e.target.dataset.field] = e.target.value; };
+      const handler = (e) => {
+        const fieldId = e.target.dataset.field;
+        if (!fieldId) return;
+        this.formData[fieldId] = e.target.value;
+
+        // 대체결의 계정코드 자동 입력 로칙
+        if (this.currentFormType === 'substitute_resolution' && fieldId === 'accountTitle') {
+          this.applySubstituteAutoFill(e.target.value);
+        }
+      };
       el.addEventListener('change', handler);
       el.addEventListener('input', handler);
     });
@@ -100,6 +109,41 @@ class FormManager {
         if (label) label.classList.toggle('checked', e.target.checked);
       });
     });
+  }
+
+  applySubstituteAutoFill(type) {
+    const debitEl = document.getElementById('field_debitAccount');
+    const creditEl = document.getElementById('field_creditAccount');
+    const descEl = document.getElementById('field_description');
+
+    if (!debitEl || !creditEl) return;
+
+    let debit = '';
+    let credit = '11113'; // 기본: 보통예금
+
+    if (type.includes('인건비')) {
+      debit = '11114'; // 당좌예금
+      credit = '11113';
+    } else if (type.includes('간접비')) {
+      debit = '11113';
+      credit = '11113';
+    } else if (type.includes('퇴직')) {
+      debit = '11114';
+      credit = '11113';
+    } else if (type.includes('이자')) {
+      debit = '11113';
+      credit = '11113';
+    }
+
+    debitEl.value = debit;
+    creditEl.value = credit;
+    this.formData['debitAccount'] = debit;
+    this.formData['creditAccount'] = credit;
+
+    if (descEl && !descEl.value) {
+      descEl.value = `${type} 처리의 건`;
+      this.formData['description'] = descEl.value;
+    }
   }
 
   collectFormData() {
@@ -227,6 +271,34 @@ class FormManager {
 
   mapFormToExcelRow(data) {
     const dateRaw = (data.resDate || '').replace(/-/g, '');
+    if (this.currentFormType === 'substitute_resolution') {
+      return {
+        no: '',
+        scheduledDate: dateRaw,
+        transferDate: dateRaw,
+        description: data.description || '',
+        amount: data.amount || '',
+        actualAmount: data.amount || '',
+        fromBank: '기업은행',
+        fromAccount: data.creditAccount || '11113',
+        payee: data.debitAccount || '',
+        toBank: '기업은행',
+        toAccount: data.debitAccount || '',
+        processType: '대체결의',
+        fundSource: data.fundSource || '국고',
+        expenseCategory: data.accountTitle || '',
+        subCategory: data.accountTitle || '',
+        evidenceDate: dateRaw,
+        supplyAmount: data.amount || '',
+        vatAmount: '0',
+        status: '승인',
+        vendor: '',
+        accountingDate: dateRaw,
+        docNumber: '',
+        resolutionNumber: data.resNo || ''
+      };
+    }
+
     return {
       no: '',
       scheduledDate: dateRaw,
