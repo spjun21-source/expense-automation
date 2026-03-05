@@ -19,6 +19,7 @@ class ExpenseAgent:
 
     def process_new_receipts(self):
         """Scans the inbox folder, parses images, logs to Excel, and archives them."""
+        print("Starting Expense Agent v1.0.0...")
         files = [f for f in os.listdir(self.inbox_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.pdf'))]
         
         if not files:
