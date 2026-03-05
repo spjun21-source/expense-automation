@@ -1,0 +1,693 @@
+﻿// ============================================================
+
+import { WORKFLOW_STEPS } from './data.js';
+import { initSupabase } from './supabase.js';
+
+class TaskManager {
+    constructor(userid, options = {}) {
+        this.userid = userid;
+        this.currentDate = this._todayStr();
+        this.isAdmin = options.isAdmin || false;
+        this.allUserIds = options.allUserIds || [userid];
+        this.userMap = options.userMap || {};
+        this.filterUserId = '?꾩껜';
+
+        this.supabase = initSupabase();
+        this.container = null;
+        this.syncStatus = 'IDLE';
+        this._setupRealtime();
+    }
+
+    _todayStr() {
+        // 紐⑤뱺 釉뚮씪?곗??먯꽌 ?숈씪???쒓뎅 ?쒖???KST) ?좎쭨瑜??ъ슜?섎룄濡?媛뺤젣
+        const now = new Date();
+        const kstOffset = 9 * 60; // KST is UTC+9
+        const kstDate = new Date(now.getTime() + (kstOffset * 60 * 1000));
+        return kstDate.toISOString().split('T')[0];
+    }
+
+    _storageKey(date) {
+        return `daily_tasks_shared_${date || this.currentDate}`;
+    }
+
+    _commentKey(date) {
+        return `daily_comment_shared_${date || this.currentDate}`;
+    }
+
+    async _withTimeout(promise, ms = 2000, name = 'Task Query') {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} Timeout`)), ms))
+        ]);
+    }
+
+    async _load(date) {
+        if (this.supabase) {
+            try {
+                const targetDate = date || this.currentDate;
+                const { data, error } = await this._withTimeout(
+                    this.supabase.from('tasks').select('*')
+                        .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.?꾨즺)`)
+                        .order('createdat', { ascending: true }),
+                    1500, 'Tasks Load'
+                );
+                if (error) throw error;
+                // v5.2.14: Data Normalization (DB ??뚮Ц??李⑥씠 洹밸났)
+                return (data || []).map(row => ({
+                    id: row.id,
+                    text: row.text,
+                    status: row.status,
+                    userid: (row.userid || row.userId || '').toLowerCase(),
+                    workflowid: row.workflowid || row.workflowId,
+                    memo: row.memo,
+                    createdat: row.createdat || row.createdAt,
+                    createdatfull: row.createdatfull || row.createdAtFull,
+                    date: row.date
+                }));
+            } catch (e) {
+                console.warn('?좑툘 [Tasks] Cloud Load failed, using local fallback:', e.message);
+            }
+        }
+
+        // Fallback to localStorage
+        try {
+            return JSON.parse(localStorage.getItem(this._storageKey(date)) || '[]');
+        } catch { return []; }
+    }
+
+    async _save(tasks, date) {
+        // Local save (always)
+        localStorage.setItem(this._storageKey(date), JSON.stringify(tasks));
+
+        // Cloud save (if connected)
+        if (this.supabase) {
+            // TaskManager mostly operates by replacing the whole set in local mode,
+            // but in cloud mode, individual updates are better. 
+            // For now, we sync the whole day's tasks to keep logic consistent.
+            // Note: In production, we'd upsert individually.
+            try {
+                const { error } = await this.supabase
+                    .from('tasks')
+                    .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
+                if (error) {
+                    console.error('Supabase Sync Error:', error);
+                    window.app?.showToast('?좑툘 ?대씪?곕뱶 ?숆린???ㅽ뙣 (DB ?ㅼ젙 ?뺤씤 ?꾩슂)', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                window.app?.showToast('?좑툘 ?대씪?곕뱶 ?곌껐 ?ㅻ쪟', 'error');
+            }
+        }
+
+        this._showSavedIndicator();
+    }
+
+    async _saveComment(comment, date) {
+        if (!comment || !comment.trim()) return;
+
+        // v5.2.29: Create new entry instead of overwriting
+        const newComment = {
+            id: 'cmt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+            date: date || this.currentDate,
+            content: comment.trim(),
+            userid: this.userid.toLowerCase(),
+            status: 'pending',
+            updatedat: new Date().toISOString()
+        };
+
+        // Local cache (v5.2.29: Array-based storage)
+        const localData = JSON.parse(localStorage.getItem(this._commentKey(date)) || '[]');
+        localData.push(newComment);
+        localStorage.setItem(this._commentKey(date), JSON.stringify(localData));
+
+        if (this.supabase) {
+            try {
+                const { error } = await this.supabase
+                    .from('task_comments')
+                    .insert(newComment);
+                if (error) {
+                    console.error('Comment Sync Error:', error);
+                    window.app?.showToast('?좑툘 鍮꾧퀬 ?숆린???ㅽ뙣', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        this._showSavedIndicator();
+        if (this.container) this.render(this.container);
+    }
+
+    async _loadComments(date) {
+        if (this.supabase) {
+            try {
+                const targetDate = date || this.currentDate;
+                const { data, error } = await this._withTimeout(
+                    this.supabase.from('task_comments').select('*')
+                        .or(`date.eq.${targetDate},and(date.lt.${targetDate},status.neq.completed)`)
+                        .order('updatedat', { ascending: true }),
+                    1500, 'Comments Load'
+                );
+                if (!error && data) {
+                    return data.map(row => ({
+                        ...row,
+                        userid: (row.userid || row.userId || '').toLowerCase(),
+                        status: row.status || 'pending',
+                        updatedat: row.updatedat || row.updatedAt
+                    }));
+                }
+            } catch (e) {
+                console.warn('?좑툘 [Tasks] Comments load failed:', e.message);
+            }
+        }
+        try {
+            return JSON.parse(localStorage.getItem(this._commentKey(date)) || '[]');
+        } catch { return []; }
+    }
+
+    async deleteComment(commentId) {
+        if (!confirm('??吏?쒖궗??鍮꾨쭩濡앹쓣 ??젣?섏떆寃좎뒿?덇퉴?')) return;
+
+        if (this.supabase) {
+            await this.supabase.from('task_comments').delete().eq('id', commentId);
+        }
+
+        // Always update local cache
+        const localData = JSON.parse(localStorage.getItem(this._commentKey(this.currentDate)) || '[]');
+        const filtered = localData.filter(c => c.id !== commentId);
+        localStorage.setItem(this._commentKey(this.currentDate), JSON.stringify(filtered));
+
+        window.app?.showToast('?뿊 鍮꾨쭩濡앹씠 ??젣?섏뿀?듬땲??', 'info');
+        if (this.container) this.render(this.container);
+    }
+
+    _showSavedIndicator() {
+        const indicator = document.getElementById('taskSaveIndicator');
+        if (indicator) {
+            indicator.classList.remove('visible');
+            void indicator.offsetWidth; // trigger reflow
+            indicator.classList.add('visible');
+            setTimeout(() => indicator.classList.remove('visible'), 1500);
+        }
+    }
+
+    setUser(userid) { this.userid = userid; }
+
+    setDate(dateStr) { this.currentDate = dateStr; }
+
+    prevDate() {
+        const d = new Date(this.currentDate);
+        d.setDate(d.getDate() - 1);
+        this.currentDate = d.toISOString().split('T')[0];
+        return this.currentDate;
+    }
+
+    nextDate() {
+        const d = new Date(this.currentDate);
+        d.setDate(d.getDate() + 1);
+        const today = this._todayStr();
+        const next = d.toISOString().split('T')[0];
+        if (next > today) return this.currentDate;
+        this.currentDate = next;
+        return this.currentDate;
+    }
+
+    isToday() {
+        return this.currentDate === this._todayStr();
+    }
+
+    _setupRealtime() {
+        if (!this.supabase) return;
+
+        // Clean up previous channel if any
+        if (this.channel) this.channel.unsubscribe();
+
+        this.channel = this.supabase
+            .channel('task-sync-main')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+                console.log('?뱻 [Realtime Payload Check]:', payload);
+                const newData = payload.new;
+                if (newData && newData.date === this.currentDate) {
+                    const taskUserId = (newData.userid || newData.userId || '').toLowerCase();
+                    window.app?.showToast(`?봽 [${taskUserId}] ? ?낅Т ?ㅼ떆媛??낅뜲?댄듃`, 'info');
+                    if (this.container) this.render(this.container);
+                } else {
+                    console.log('?뵂 [Realtime] Item for different date ignored.');
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'task_comments' }, payload => {
+                console.log('?뱻 [Realtime] Comments Updated:', payload);
+                if (this.container) this.render(this.container);
+            })
+            .subscribe((status) => {
+                this.syncStatus = status;
+                console.log(`?뱻 [Realtime] Status: ${status}`);
+                if (status === 'SUBSCRIBED') {
+                    console.log('??Realtime Connection Established');
+                } else if (status === 'CHANNEL_ERROR') {
+                    console.warn('?좑툘 Realtime Connection Error. Check SQL Publication settings.');
+                }
+            });
+    }
+
+    // ---- ?곗씠??愿由?----
+    async getTasks() {
+        const allTasks = await this._load(this.currentDate);
+        this.syncStatus = 'SYNCED';
+        if (this.filterUserId !== '?꾩껜') {
+            const lowerFilterId = this.filterUserId.toLowerCase();
+            return allTasks.filter(t => (t.userid || '').toLowerCase() === lowerFilterId);
+        }
+        return allTasks;
+    }
+
+    async addTask(text, workflowId = '') {
+        if (!text || !text.trim()) return null;
+        const now = new Date();
+        const task = {
+            id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+            text: text.trim(),
+            status: '?湲?,
+            memo: '',
+            createdat: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            createdatfull: now.toLocaleString('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            }),
+            userid: this.userid.toLowerCase(),
+            workflowid: workflowId,
+            date: this.currentDate
+        };
+
+        // 1. Local Cache Save
+        const tasks = await this._load(this.currentDate);
+        tasks.push(task);
+        localStorage.setItem(this._storageKey(this.currentDate), JSON.stringify(tasks));
+
+        // 2. Cloud Direct Insert (Trigger Real-time)
+        if (this.supabase) {
+            try {
+                const { error } = await this.supabase.from('tasks').insert(task);
+                if (error) {
+                    console.error('??[Supabase Error Details]:', JSON.stringify(error, null, 2));
+                    window.app?.showToast(`???쒕쾭 ???嫄곕??? ${error.message} (${error.code || 'No Code'})`, 'error');
+                    return null;
+                } else {
+                    console.log('??Cloud Sync Success:', task.id);
+                    window.app?.showToast('???쒕쾭 ?숆린???꾨즺', 'success');
+                }
+            } catch (e) {
+                console.warn('?좑툘 Cloud Sync failed:', e.message);
+                window.app?.showToast('?좑툘 ?대씪?곕뱶 ?듭떊 ?ㅽ뙣 (?ㅽ봽?쇱씤 ?곷룞)', 'warning');
+            }
+        }
+
+        if (this.container) this.render(this.container);
+        return task;
+    }
+
+    async forceRefresh() {
+        window.app?.showToast('?봽 ?쒕쾭 ?곗씠?곕? ?숆린?뷀빀?덈떎...', 'info');
+        if (this.container) await this.render(this.container);
+    }
+
+    async cycleStatus(taskId, targetUserId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        const cycle = { '?湲?: '吏꾪뻾', '吏꾪뻾': '?꾨즺', '?꾨즺': '?湲? };
+        task.status = cycle[task.status] || '?湲?;
+
+        let updates = { status: task.status };
+        if (task.date < this.currentDate) {
+            task.date = this.currentDate;
+            updates.date = this.currentDate;
+        }
+
+        if (this.supabase) {
+            await this.supabase.from('tasks').update(updates).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
+        return task;
+    }
+
+    async updateMemo(taskId, memo, targetUserId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        task.memo = memo;
+        if (this.supabase) {
+            await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
+        window.app?.showToast('?뱷 鍮꾧퀬媛 ??λ릺?덉뒿?덈떎.', 'success');
+        return task;
+    }
+
+    async deleteTask(taskId, targetUserId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        if (this.supabase) {
+            await this.supabase.from('tasks').delete().eq('id', taskId);
+        } else {
+            const filtered = tasks.filter(t => t.id !== taskId);
+            await this._save(filtered, this.currentDate);
+        }
+        window.app?.showToast('?뿊 ?좎씪????젣?섏뿀?듬땲??', 'info');
+    }
+
+    // ---- ?듦퀎 諛??붿빟 ----
+    getStatsByData(tasks) {
+        const total = tasks.length;
+        const waiting = tasks.filter(t => t.status === '?湲?).length;
+        const inProgress = tasks.filter(t => t.status === '吏꾪뻾').length;
+        const done = tasks.filter(t => t.status === '?꾨즺').length;
+        const calcPct = (count) => total === 0 ? 0 : Math.round((count / total) * 100);
+
+        return {
+            total,
+            waiting, waitingPct: calcPct(waiting),
+            inProgress, inProgressPct: calcPct(inProgress),
+            done, donePct: calcPct(done)
+        };
+    }
+
+    getAllUsersTasks() {
+        return this.getTasks();
+    }
+
+    async getStatsByUser() {
+        const result = {};
+        const allTasks = await this._load(this.currentDate);
+
+        this.allUserIds.forEach(uid => {
+            const lowerUid = uid.toLowerCase();
+            const userTasks = allTasks.filter(t => (t.userid || '').toLowerCase() === lowerUid);
+            result[uid] = this.getStatsByData(userTasks);
+        });
+        return result;
+    }
+
+    // ============================================
+    // ??쒕낫???뚮뜑留?    // ============================================
+    async render(container) {
+        if (!container) return;
+        this.container = container;
+        const isToday = this.isToday();
+        const dateDisplay = new Date(this.currentDate + 'T00:00:00').toLocaleDateString('ko-KR', {
+            year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+        });
+
+        // ?곗씠??濡쒕뱶
+        const tasks = await this.getTasks();
+        const mainStats = this.getStatsByData(tasks);
+        const dailyComments = await this._loadComments(this.currentDate);
+
+        // ?곷떒 ?ъ슜???꾪꽣 移?援ъ꽦 (v5.2.29)
+        const userChipsHtml = `
+            <div class="user-filter-chips">
+                <div class="user-chip ${!this.filterUserId || this.filterUserId === '?꾩껜' ? 'active' : ''}" data-filter-uid="?꾩껜">?꾩껜蹂닿린</div>
+                ${this.allUserIds.map(uid => `
+                    <div class="user-chip ${this.filterUserId === uid ? 'active' : ''}" data-filter-uid="${uid}">${this.userMap[uid] || uid}</div>
+                `).join('')}
+            </div>
+        `;
+
+        // ... header and stats 
+
+        // 488: Traceable Timeline Rendering
+        const commentsHtml = dailyComments.length === 0 ?
+            '<div class="comments-empty">?깅줉??吏?쒖궗??씠??鍮꾨쭩濡앹씠 ?놁뒿?덈떎.</div>' :
+            dailyComments.map((c, idx) => `
+                <div class="comment-item ${c.status === 'completed' ? 'completed' : ''}" data-cmt-id="${c.id}">
+                    <div class="comment-seq">#${idx + 1}</div>
+                    <div class="comment-body">
+                        <div class="comment-text">${c.content}</div>
+                        <div class="comment-meta">
+                            ?뫀 ${this.userMap[c.userid] || c.userid} | ${new Date(c.updatedat || c.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                    </div>
+                    <div class="comment-actions">
+                        <button class="btn-icon c-status-toggle" data-cmt-id="${c.id}" data-status="${c.status || 'pending'}" title="${c.status === 'completed' ? '?湲곗긽?쒕줈 蹂寃? : '?꾨즺泥섎━'}">
+                            ${c.status === 'completed' ? '?? : '??}
+                        </button>
+                        <button class="btn-icon c-delete-btn" data-cmt-id="${c.id}" title="??젣">?뿊截?/button>
+                    </div>
+                </div>
+            `).join('');
+
+        container.innerHTML = `
+          <div class="tasks-widget">
+            <!-- Header, UserChips, Input logic exactly as before but UI is adjusted for Sidebar -->
+            <div class="tasks-header">
+                <h3 class="tasks-title">?뱦 ? ?낅Т ??쒕낫??/h3>
+                <div class="tasks-date-nav">
+                    <button class="tasks-nav-btn" id="taskPrevDate">?</button>
+                    <span class="tasks-date">${dateDisplay}</span>
+                    <button class="tasks-nav-btn" id="taskNextDate" ${isToday ? 'disabled' : ''}>??/button>
+                    <button class="tasks-nav-btn" id="taskRefreshCloud">?봽</button>
+                </div>
+            </div>
+
+            ${userChipsHtml}
+
+            <!-- Task List and Summary Sections... -->
+            <div class="tasks-list" id="tasksList">
+                ${tasks.length === 0 ? '<div class="tasks-empty">?곗씠?곌? ?놁뒿?덈떎.</div>' : tasks.map(t => this._renderTask(t, isToday)).join('')}
+            </div>
+
+            <div class="tasks-comment-area v5-2-31">
+                <div class="comment-header">
+                    <span class="comment-title">?뱷 ? 鍮꾨쭩濡?/ 吏?쒖궗??/span>
+                </div>
+                <div class="comment-input-row">
+                    <input type="text" id="dailyCommentInput" placeholder="鍮꾨쭩濡앹씠??吏?쒖궗??쓣 ?낅젰?섏꽭??.." maxlength="500">
+                    <button class="btn btn-sm btn-primary" id="btnSaveComment">?깅줉</button>
+                </div>
+                <div class="comments-timeline">
+                    ${commentsHtml}
+                </div>
+            </div>
+          </div>
+        `;
+
+        this._bindEvents(container);
+    }
+
+    async toggleCommentStatus(cmtId, currentStatus) {
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+
+        let targetComment = null;
+        if (this.supabase) {
+            try {
+                // Fetch the comment to check its date
+                const { data } = await this.supabase.from('task_comments').select('*').eq('id', cmtId).single();
+                let updates = { status: newStatus };
+                if (data && data.date < this.currentDate) {
+                    updates.date = this.currentDate;
+                }
+                await this.supabase.from('task_comments').update(updates).eq('id', cmtId);
+            } catch (e) { console.error(e); }
+        }
+
+        // Local Sync
+        const local = JSON.parse(localStorage.getItem(this._commentKey()) || '[]');
+        const idx = local.findIndex(c => c.id === cmtId);
+        if (idx !== -1) {
+            local[idx].status = newStatus;
+            localStorage.setItem(this._commentKey(), JSON.stringify(local));
+        }
+        if (this.container) this.render(this.container);
+    }
+
+    async deleteComment(cmtId) {
+        if (!confirm('吏?쒖궗??쓣 ??젣?섏떆寃좎뒿?덇퉴?')) return;
+        if (this.supabase) {
+            try {
+                await this.supabase.from('task_comments').delete().eq('id', cmtId);
+            } catch (e) { console.error(e); }
+        }
+        // Local Sync
+        const local = JSON.parse(localStorage.getItem(this._commentKey()) || '[]');
+        const filtered = local.filter(c => c.id !== cmtId);
+        localStorage.setItem(this._commentKey(), JSON.stringify(filtered));
+        if (this.container) this.render(this.container);
+    }
+
+    _renderTask(task, editable) {
+        const statusIcons = { '?湲?: '燧?, '吏꾪뻾': '?봽', '?꾨즺': '?? };
+        const statusClass = { '?湲?: 'waiting', '吏꾪뻾': 'progress', '?꾨즺': 'done' };
+        const lowerTaskUserId = (task.userid || '').toLowerCase();
+        const lowerCurrentUserId = this.userid.toLowerCase();
+        const isOwn = lowerTaskUserId === lowerCurrentUserId;
+        const canEdit = editable;
+        const hasMemo = task.memo && task.memo.trim();
+        const workflow = task.workflowid ? WORKFLOW_STEPS.find(s => s.id === task.workflowid) : null;
+
+        return `
+      <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userid}">
+        <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userid}" title="?곹깭 蹂寃?>
+          ${statusIcons[task.status]}
+        </button>
+        <div class="task-main-content">
+          <div class="task-meta-top">
+            <span class="task-author-badge ${isOwn ? 'own' : ''}">${this.userMap[lowerTaskUserId] || lowerTaskUserId}</span>
+            ${workflow ? `<span class="task-workflow-badge">?뵕 ${workflow.title}</span>` : ''}
+            <span class="task-full-time" title="?앹꽦 ?쇱떆">${task.createdatfull || task.createdat}</span>
+          </div>
+          <div class="task-text-row">
+            <span class="task-text ${task.status === '?꾨즺' ? 'completed' : ''}">${task.text}</span>
+          </div>
+        </div>
+        <button class="task-memo-btn ${hasMemo ? 'has-memo' : ''}" data-action="memo" data-id="${task.id}" data-owner="${task.userid}" title="${hasMemo ? task.memo : '鍮꾧퀬 異붽?'}">
+          ${hasMemo ? '?뮠' : '?뱷'}
+        </button>
+        ${canEdit ? `<button class="task-delete-btn" data-action="delete" data-id="${task.id}" data-owner="${task.userid}" title="??젣">?뿊</button>` : ''}
+      </div>
+      ${hasMemo ? `<div class="task-memo-display" data-memo-for="${task.id}"><span class="memo-label">鍮꾧퀬:</span> ${task.memo}</div>` : ''}`;
+    }
+
+    _bindEvents(container) {
+        // ?낅Т 異붽?
+        const input = container.querySelector('#taskInput');
+        const workflowSelect = container.querySelector('#taskWorkflowLink');
+        const addBtn = container.querySelector('#taskAddBtn');
+        if (input && addBtn) {
+            const addTask = async () => {
+                if (input.value.trim()) {
+                    await this.addTask(input.value, workflowSelect?.value || '');
+                    this.render(container);
+                }
+            };
+            addBtn.addEventListener('click', addTask);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+        }
+
+        // ?곹깭 蹂寃? ??젣, 媛쒕퀎 硫붾え
+        container.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const action = btn.dataset.action;
+                const id = btn.dataset.id;
+                const owner = btn.dataset.owner || this.userid;
+
+                if (action === 'cycle') {
+                    this.cycleStatus(id, owner).then(() => this.render(container));
+                } else if (action === 'delete') {
+                    if (confirm('???낅Т瑜???젣?섏떆寃좎뒿?덇퉴?')) {
+                        this.deleteTask(id, owner).then(() => this.render(container));
+                    }
+                } else if (action === 'memo') {
+                    e.stopPropagation();
+                    this._showMemoEditor(container, id, owner);
+                }
+            });
+        });
+
+        // 鍮꾨쭩濡?(Comment) ???        const commentInput = container.querySelector('#dailyCommentInput');
+        const saveCommentBtn = container.querySelector('#btnSaveComment');
+        if (commentInput && saveCommentBtn) {
+            const saveComment = async () => {
+                const val = commentInput.value;
+                if (val.trim()) {
+                    await this._saveComment(val, this.currentDate);
+                    commentInput.value = ''; // Clear after save
+                    window.app?.showToast('?뱷 吏?쒖궗??씠 ?깅줉?섏뿀?듬땲??', 'success');
+                }
+            };
+            saveCommentBtn.addEventListener('click', saveComment);
+            commentInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveComment(); });
+        }
+
+        // 鍮꾨쭩濡???젣 (Delegation)
+        container.querySelectorAll('.c-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.cmtId;
+                await this.deleteComment(id);
+            });
+        });
+
+        // 鍮꾨쭩濡??좉? (v5.2.31)
+        container.querySelectorAll('.c-status-toggle').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.cmtId;
+                const status = btn.dataset.status;
+                await this.toggleCommentStatus(id, status);
+            });
+        });
+
+        // 愿由ъ옄 ?꾪꽣
+        container.querySelector('#taskUserFilter')?.addEventListener('change', (e) => {
+            this.filterUserId = e.target.value;
+            this.render(container);
+        });
+
+        // ?ъ슜??移??대┃ ?꾪꽣
+        container.querySelectorAll('[data-filter-uid]').forEach(el => {
+            el.addEventListener('click', () => {
+                this.filterUserId = el.dataset.filterUid;
+                this.render(container);
+            });
+        });
+
+        // ?좎쭨 ?먯깋
+        container.querySelector('#taskPrevDate')?.addEventListener('click', () => {
+            this.prevDate();
+            this.render(container);
+        });
+        container.querySelector('#taskNextDate')?.addEventListener('click', () => {
+            this.nextDate();
+            this.render(container);
+        });
+
+        // ?대씪?곕뱶 ?덈줈怨좎묠
+        container.querySelector('#taskRefreshCloud')?.addEventListener('click', () => {
+            this.forceRefresh();
+        });
+    }
+
+    async _showMemoEditor(container, taskId, ownerId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        const currentMemo = task?.memo || '';
+
+        const existingEditor = container.querySelector('.task-memo-editor');
+        if (existingEditor) existingEditor.remove();
+
+        const taskItem = container.querySelector(`[data-id="${taskId}"].task-item`);
+        if (!taskItem) return;
+
+        const editor = document.createElement('div');
+        editor.className = 'task-memo-editor';
+        editor.innerHTML = `
+      <input type="text" class="task-memo-input" value="${currentMemo}" placeholder="鍮꾧퀬 ?댁슜???낅젰?섏꽭??.." maxlength="200">
+      <div class="editor-actions">
+        <button class="btn btn-xs btn-primary task-memo-save">???/button>
+        <button class="btn btn-xs btn-outline task-memo-cancel">痍⑥냼</button>
+      </div>
+    `;
+
+        const memoDisplay = container.querySelector(`[data-memo-for="${taskId}"]`);
+        const insertAfter = memoDisplay || taskItem;
+        insertAfter.parentNode.insertBefore(editor, insertAfter.nextSibling);
+
+        const memoInput = editor.querySelector('.task-memo-input');
+        memoInput.focus();
+
+        const saveMemo = async () => {
+            await this.updateMemo(taskId, memoInput.value.trim(), ownerId);
+            this.render(container);
+        };
+
+        editor.querySelector('.task-memo-save').addEventListener('click', saveMemo);
+        memoInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveMemo(); });
+        editor.querySelector('.task-memo-cancel').addEventListener('click', () => editor.remove());
+    }
+}
+
+export { TaskManager };
