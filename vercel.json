@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "name": "expense-automation",
+    "cleanUrls": true,
+    "rewrites": [
+        {
+            "source": "/((?!js/|css/|assets/|favicon.ico).*)",
+            "destination": "/index.html"
+        }
+    ]
+}
