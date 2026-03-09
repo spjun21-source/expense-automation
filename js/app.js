@@ -1,6 +1,6 @@
-const APP_VERSION = 'v5.2.38.2 (CoreBot v1.2.0)';
+const APP_VERSION = 'v5.2.38.3 (CoreBot v1.2.0)';
 
-console.log('📦 [app.js] Module load start (v5.2.38.2)');
+console.log('📦 [app.js] Module load start (v5.2.38.3)');
 
 import { WORKFLOW_STEPS, SCENARIOS, FORM_FIELDS, DOCUMENT_TYPES, EXCEL_COLUMNS } from './data.js?v=5.2.37';
 import { TutorialEngine } from './tutorial.js?v=5.2.37';

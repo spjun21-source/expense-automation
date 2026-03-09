@@ -61,19 +61,28 @@ class TaskManager {
                 );
                 if (error) throw error;
                 // v5.2.14: Data Normalization (DB 대소문자 차이 극복)
-                return (data || []).map(row => ({
-                    id: row.id,
-                    text: row.text,
-                    status: row.status,
-                    processstatus: row.processstatus || '',
-                    userid: (row.userid || row.userId || '').toLowerCase(),
-                    workflowid: row.workflowid || row.workflowId,
-                    memo: row.memo,
-                    category: row.category || '', // Added categorization
-                    createdat: row.createdat || row.createdAt,
-                    createdatfull: row.createdatfull || row.createdAtFull,
-                    date: row.date
-                }));
+                return (data || []).map(row => {
+                    let actualMemo = row.memo || '';
+                    let ps = '';
+                    const psIdx = actualMemo.lastIndexOf('||PS:');
+                    if (psIdx !== -1) {
+                        ps = actualMemo.substring(psIdx + 5);
+                        actualMemo = actualMemo.substring(0, psIdx);
+                    }
+                    return {
+                        id: row.id,
+                        text: row.text,
+                        status: row.status,
+                        processstatus: ps || row.processstatus || '',
+                        userid: (row.userid || row.userId || '').toLowerCase(),
+                        workflowid: row.workflowid || row.workflowId,
+                        memo: actualMemo,
+                        category: row.category || '', // Added categorization
+                        createdat: row.createdat || row.createdAt,
+                        createdatfull: row.createdatfull || row.createdAtFull,
+                        date: row.date
+                    };
+                });
             } catch (e) {
                 console.warn('⚠️ [Tasks] Cloud Load failed, using local fallback:', e.message);
             }
@@ -96,9 +105,14 @@ class TaskManager {
             // For now, we sync the whole day's tasks to keep logic consistent.
             // Note: In production, we'd upsert individually.
             try {
+                const dbTasks = tasks.map(t => {
+                    const dbT = { ...t, date: date || this.currentDate, memo: `${t.memo || ''}||PS:${t.processstatus || ''}` };
+                    delete dbT.processstatus;
+                    return dbT;
+                });
                 const { error } = await this.supabase
                     .from('tasks')
-                    .upsert(tasks.map(t => ({ ...t, date: date || this.currentDate })), { onConflict: 'id' });
+                    .upsert(dbTasks, { onConflict: 'id' });
                 if (error) {
                     console.error('Supabase Sync Error:', error);
                     window.app?.showToast('⚠️ 클라우드 동기화 실패 (DB 설정 확인 필요)', 'error');
@@ -306,7 +320,9 @@ class TaskManager {
         // 2. Cloud Direct Insert (Trigger Real-time)
         if (this.supabase) {
             try {
-                const { error } = await this.supabase.from('tasks').insert(task);
+                const dbTask = { ...task, memo: `${task.memo || ''}||PS:${task.processstatus || ''}` };
+                delete dbTask.processstatus;
+                const { error } = await this.supabase.from('tasks').insert(dbTask);
                 if (error) {
                     console.error('❌ [Supabase Error Details]:', JSON.stringify(error, null, 2));
                     window.app?.showToast(`❌ 서버 저장 거부됨: ${error.message} (${error.code || 'No Code'})`, 'error');
@@ -358,7 +374,7 @@ class TaskManager {
         if (!task) return null;
 
         task.processstatus = newStatus;
-        let updates = { processstatus: newStatus };
+        let updates = { memo: `${task.memo || ''}||PS:${newStatus}` }; // Pack into memo for DB
 
         if (this.supabase) {
             await this.supabase.from('tasks').update(updates).eq('id', taskId);
@@ -394,7 +410,7 @@ class TaskManager {
 
         task.memo = memo;
         if (this.supabase) {
-            await this.supabase.from('tasks').update({ memo: memo }).eq('id', taskId);
+            await this.supabase.from('tasks').update({ memo: `${memo || ''}||PS:${task.processstatus || ''}` }).eq('id', taskId);
         } else {
             await this._save(tasks, this.currentDate);
         }
