@@ -65,6 +65,7 @@ class TaskManager {
                     id: row.id,
                     text: row.text,
                     status: row.status,
+                    processstatus: row.processstatus || '',
                     userid: (row.userid || row.userId || '').toLowerCase(),
                     workflowid: row.workflowid || row.workflowId,
                     memo: row.memo,
@@ -285,6 +286,7 @@ class TaskManager {
             id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
             text: text.trim(),
             status: '대기',
+            processstatus: '',
             memo: '',
             createdat: now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
             createdatfull: now.toLocaleString('ko-KR', {
