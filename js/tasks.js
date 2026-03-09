@@ -5,7 +5,7 @@ import { initSupabase } from './supabase.js';
 
 const PROCESS_STATUS_OPTIONS = [
     '', '품의', '청구결의', '지출결의', '결재 중', '결재 완료',
-    '재무팀 제출', '이체전송', '이체확인', '이지바로 업로드', '스캔및 서류철'
+    '스캔및 서류철', '재무팀 제출', '이체전송', '이체확인', '이지바로 업로드'
 ];
 
 class TaskManager {
