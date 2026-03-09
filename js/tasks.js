@@ -3,6 +3,11 @@
 import { WORKFLOW_STEPS } from './data.js';
 import { initSupabase } from './supabase.js';
 
+const PROCESS_STATUS_OPTIONS = [
+    '', '품의', '청구결의', '지출결의', '결재 중', '결재 완료',
+    '재무팀 제출', '이체전송', '이체확인', '이지바로 업로드', '스캔및 서류철'
+];
+
 class TaskManager {
     constructor(userid, options = {}) {
         this.userid = userid;
@@ -336,6 +341,22 @@ class TaskManager {
             task.date = this.currentDate;
             updates.date = this.currentDate;
         }
+
+        if (this.supabase) {
+            await this.supabase.from('tasks').update(updates).eq('id', taskId);
+        } else {
+            await this._save(tasks, this.currentDate);
+        }
+        return task;
+    }
+
+    async updateProcessStatus(taskId, newStatus, targetUserId) {
+        const tasks = await this._load(this.currentDate);
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return null;
+
+        task.processstatus = newStatus;
+        let updates = { processstatus: newStatus };
 
         if (this.supabase) {
             await this.supabase.from('tasks').update(updates).eq('id', taskId);
@@ -833,11 +854,11 @@ class TaskManager {
 
     exportWeeklyToCSV(weeklyTasks, weekDates) {
         // Required format: 'ER바이오코어 사업단' Header
-        // Columns: '담당자' / '업무 내용' / '비고' / '최종 Status' / '월-일-요일'
+        // Columns: '담당자' / '업무 내용' / '비고' / '최종 Status' / '처리 상태' / '월-일-요일'
 
         let csvContent = '\uFEFF'; // BOM for UTF-8 Excel support
         csvContent += '"ER바이오코어 사업단 주간 업무 보고서"\n\n';
-        csvContent += '"담당자","업무 내용","비고","최종 Status","월-일-요일"\n';
+        csvContent += '"담당자","업무 내용","비고","최종 Status","처리 상태","월-일-요일"\n';
 
         const daysKor = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -858,7 +879,7 @@ class TaskManager {
             const d = new Date(t.date);
             const dateStrFormatted = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${daysKor[d.getDay()]}`;
 
-            csvContent += `"${userName}","${text}","${memo}","${t.status}","${dateStrFormatted}"\n`;
+            csvContent += `"${userName}","${text}","${memo}","${t.status}","${t.processstatus || ''}","${dateStrFormatted}"\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1062,6 +1083,10 @@ class TaskManager {
         else if (userName === '박선영') badgeClass = ' badge-seonyoung';
         else if (isOwn) badgeClass = ' own';
 
+        const processOptions = PROCESS_STATUS_OPTIONS.map(opt =>
+            `<option value="${opt}" ${task.processstatus === opt ? 'selected' : ''}>${opt || '(Status)'}</option>`
+        ).join('');
+
         return `
       <div class="task-item ${statusClass[task.status]}" data-id="${task.id}" data-owner="${task.userid}">
         <button class="task-status-btn ${statusClass[task.status]}" data-action="cycle" data-id="${task.id}" data-owner="${task.userid}" title="상태 변경">
@@ -1071,6 +1096,9 @@ class TaskManager {
           <div class="task-meta-top">
             <span class="task-author-badge ${badgeClass.trim()}">${userName}</span>
             ${workflow ? `<span class="task-workflow-badge">🔗 ${workflow.title}</span>` : ''}
+            <select class="task-process-select" data-id="${task.id}" data-owner="${task.userid}" title="업무 처리 상태">
+              ${processOptions}
+            </select>
             <span class="task-full-time" title="생성 일시">${task.createdatfull || task.createdat}</span>
           </div>
           <div class="task-text-row">
@@ -1174,6 +1202,17 @@ class TaskManager {
                     e.stopPropagation();
                     this._showMemoEditor(container, id, owner);
                 }
+            });
+        });
+
+        // 업무 처리 상태 (Process Status) 변경
+        container.querySelectorAll('.task-process-select').forEach(select => {
+            select.addEventListener('change', async (e) => {
+                const taskId = select.dataset.id;
+                const ownerId = select.dataset.owner;
+                const newStatus = e.target.value;
+                await this.updateProcessStatus(taskId, newStatus, ownerId);
+                window.app?.showToast('✨ 처리 상태가 업데이트되었습니다.', 'success');
             });
         });
 
